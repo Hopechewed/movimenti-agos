@@ -1245,6 +1245,30 @@ function pianoHint(p){
   return base;
 }
 function piano2rule(p){ return {id:"piano:"+p.id,planId:p.id,piano:true,type:p.type,from:p.from,dow:p.dow,days:p.days,desc:p.desc,cat:p.cat,conto:p.conto,imp:p.imp,hint:pianoHint(p)}; }
+// ---------- saldo previsionale: spese ricorrenti già previste ma non ancora confermate ----------
+function pianoConfermatoOggi(p,now){
+  const rows=S.rows.filter(r=>r.planId===p.id);
+  if(p.type==="interval"){ if(!rows.length) return false; const last=rows.reduce((a,b)=>a.d>b.d?a:b); return daysBetween(fromISO(last.d),now)<(p.days||30)-2; }
+  if(p.type==="weekly"){ const since=(now.getDay()-(p.dow||0)+7)%7; const start=new Date(now); start.setDate(now.getDate()-since); const startISO=dateISO(start); return rows.some(r=>r.d>=startISO); }
+  const ym=dateISO(now).slice(0,7); return rows.some(r=>r.d.slice(0,7)===ym);
+}
+function pianoPendente(p,now){
+  if(!pianoAttivo(p,now)) return false;
+  if(p.type==="interval") return !(p.inizio&&dateISO(now)<p.inizio)&&!pianoConfermatoOggi(p,now);
+  if(p.type==="weekly"){
+    const since=(now.getDay()-(p.dow||0)+7)%7; const start=new Date(now); start.setDate(now.getDate()-since);
+    const fine=dateISO(new Date(start.getFullYear(),start.getMonth(),start.getDate()+6));
+    if(p.inizio&&p.inizio>fine) return false;
+    return !pianoConfermatoOggi(p,now);
+  }
+  const ym=dateISO(now).slice(0,7);
+  if(p.inizio&&p.inizio.slice(0,7)>ym) return false;
+  return !pianoConfermatoOggi(p,now);
+}
+function pianoInScadenza(p,now){ return p.type==="monthly"?now.getDate()>=(p.from||1):true; }
+function pianiPendenti(now){ now=now||today(); return S.piani.filter(p=>pianoPendente(p,now)); }
+function pianoSignedAmt(p){ const tipo=(S.cats.find(c=>c.name===p.cat)||{}).tipo||"Spesa"; return tipo==="Entrata"?p.imp:-p.imp; }
+function previsionaleDelta(now){ return pianiPendenti(now).reduce((a,p)=>a+pianoSignedAmt(p),0); }
 function allRules(){
   const H=allHist(); const rules=[];
   const now=today();
@@ -1425,7 +1449,7 @@ function resetForm(){ F.amt=""; F.desc=""; $("desc").value=""; if($("catSearch")
 async function send(){
   const r=currentRow();
   haptic("ok"); let ok=true;
-  S.rows.push({id:newId(),d:r.DataISO,desc:r.Descrizione,cat:r.Categoria,conto:r.Conto,imp:r.Importo}); syncLocal();
+  S.rows.push({id:newId(),d:r.DataISO,desc:r.Descrizione,cat:r.Categoria,conto:r.Conto,imp:r.Importo,planId:F.planId||null}); syncLocal();
   S.log.unshift({...r,ts:Date.now(),ok}); S.log=S.log.slice(0,60);
   learn(r);
   if(F.planId){ const p=S.piani.find(x=>x.id===F.planId); if(p){ p.fatte=(p.fatte||0)+1; if(pianoScaduto(p)) p.attivo=false; } }
@@ -1951,6 +1975,15 @@ function renderRp(){
     <div class="ytd">${stato==="ok"?"Spese del mese sotto la tua media":stato==="warn"?"Spese del mese in linea con la tua media":stato==="over"?"Spese del mese sopra la tua media":"Primo mese: nessuna media di confronto"}</div>`;
   if(ytd!=null) h+=`<div class="ytd">Da inizio anno <em class="${ytd<0?"neg":""}">${ytd>=0?"+":"−"}${fmtIT(Math.abs(ytd))} €</em></div>`;
   if(!isCur) h+=`<div class="ytd" style="opacity:.8">Liquidità, carte e asset qui sotto sono quelli di oggi</div>`;
+  if(isCur){
+    const oggi=today(); const pend=pianiPendenti(oggi);
+    if(pend.length){
+      const delta=previsionaleDelta(oggi), prev=D.patrimonio+delta;
+      h+=`<div class="grid3" style="grid-template-columns:1fr 1fr"><div><small>Saldo reale</small><b>${fmtIT(D.patrimonio)} €</b></div><div><small>Saldo previsionale</small><b>${fmtIT(prev)} €</b></div></div>`;
+      h+=`<ul class="rows" style="margin-top:4px">${pend.map(p=>{ const amt=pianoSignedAmt(p), due=pianoInScadenza(p,oggi);
+        return `<li><span>${esc(p.desc)}${due?` <small>da confermare in “Nuovo”</small>`:` <small>previsto${p.type==="monthly"?" il "+p.from+" del mese":""}</small>`}</span><b class="${amt>=0?"in":""}">${amt>=0?"+":"−"}${fmtIT(Math.abs(amt))} €</b></li>`; }).join("")}</ul>`;
+    }
+  }
   const SCx=serieComposizione(); const prevPt=SCx?[...SCx.pts].reverse().find(p=>p.kind==="hist"&&p.d<dateISO(today()).slice(0,7)+"-02"&&p.liq!=null):null;
   const dLiq=prevPt?D.liquidita-prevPt.liq:null, dAss=prevPt?D.assetTot-prevPt.asset:null;
   const delta=v=>v==null?"":`<em class="dv ${v>=0?"up":"down"}">${v>=0?"+":"−"}${fmt0(Math.abs(v))} € sul mese scorso</em>`;
