@@ -893,6 +893,10 @@
   <div id="rpBody"></div>
 </div>
 
+<div class="sheet rp" id="sheetBud">
+  <div id="budBody"></div>
+</div>
+
 <div class="sheet mv" id="sheetMv">
   
   <div class="field"><input type="text" id="mvQ" placeholder="Cerca descrizione…" autocomplete="off" autocorrect="off" enterkeyhint="search"></div>
@@ -1172,6 +1176,7 @@ let saveT;
 function save(){ clearTimeout(saveT); saveT=setTimeout(()=>{ const {cache,...rest}=S; writeStore(JSON.stringify(rest)); },150); }
 // Tutto vive su questo telefono: la "cache" che prima arrivava da Excel viene ricostruita dai dati locali
 function syncLocal(){
+  if(S.accounts.some(a=>a.addebita&&Math.abs(a.saldo0||0)>0.004&&!a.pregressoData)){ fissaPregresso(S.accounts); save(); }
   CATS.length=0; S.cats.forEach(c=>CATS.push(c.name));
   IN_CATS.clear(); S.cats.filter(c=>c.tipo==="Entrata").forEach(c=>IN_CATS.add(c.name));
   CONTI.length=0; S.accounts.forEach(a=>CONTI.push(a.name));
@@ -1246,6 +1251,10 @@ function pianoHint(p){
   return base;
 }
 function piano2rule(p){ return {id:"piano:"+p.id,planId:p.id,piano:true,type:p.type,from:p.from,dow:p.dow,days:p.days,data:p.data,desc:p.desc,cat:p.cat,conto:p.conto,imp:p.imp,hint:pianoHint(p)}; }
+// ---------- carte: date di addebito ----------
+function cardDue(c,ym){ const [y,m]=ym.split("-").map(Number); const d=new Date(y,m-1+(c.ritardo||1),c.giorno||15); d.setHours(12,0,0,0); return d; }
+function prossimoGiorno(gg){ const t=today(); const d=new Date(t.getFullYear(),t.getMonth()+(t.getDate()<gg?0:1),gg); d.setHours(12,0,0,0); return dateISO(d); }
+function fissaPregresso(accounts){ accounts.forEach(a=>{ if(a.addebita&&Math.abs(a.saldo0||0)>0.004&&!a.pregressoData) a.pregressoData=prossimoGiorno(a.giorno||15); }); }
 // ---------- saldo previsionale: spese ricorrenti già previste ma non ancora confermate ----------
 function pianoSignedAmt(p){ const tipo=(S.cats.find(c=>c.name===p.cat)||{}).tipo||"Spesa"; return tipo==="Entrata"?p.imp:-p.imp; }
 function pianoInScadenza(p,now){ return p.type==="monthly"?now.getDate()>=(p.from||1):true; }
@@ -1270,8 +1279,12 @@ function pianiDelMese(ym){ return S.piani.filter(p=>pianoAttivoNelMese(p,ym)); }
 function confermatoNelMeseImp(p,ym){ return S.rows.filter(r=>r.planId===p.id&&r.d.slice(0,7)===ym).reduce((a,r)=>a+r.imp,0); }
 // importo previsto per il piano in quel mese, e quanto ne resta da confermare
 function pianoPrevistoMese(p,ym){ return pianoSignedAmt(p)*occorrenzeMese(p,ym); }
-function pianoResiduoMese(p,ym){ return pianoPrevistoMese(p,ym)-confermatoNelMeseImp(p,ym); }
-function previstoResiduoMese(ym){ return pianiDelMese(ym).reduce((a,p)=>a+pianoResiduoMese(p,ym),0); }
+// una ricorrenza confermata è chiusa qualunque sia l'importo effettivo (bollette variabili, piani aggiornati)
+function confermateNelMese(p,ym){ return S.rows.filter(r=>r.planId===p.id&&r.d.slice(0,7)===ym).length; }
+function pianoResiduoMese(p,ym){ return pianoSignedAmt(p)*Math.max(0,occorrenzeMese(p,ym)-confermateNelMese(p,ym)); }
+// movimenti già inseriti ma con data futura: previsti, non effettivi
+function righeFuture(ym){ const o=dateISO(today()); return S.rows.filter(r=>r.d>o&&(!ym||r.d.slice(0,7)===ym)); }
+function previstoResiduoMese(ym){ return pianiDelMese(ym).reduce((a,p)=>a+pianoResiduoMese(p,ym),0)+righeFuture(ym).reduce((a,r)=>a+r.imp,0); }
 // per il blocco "in scadenza oggi" (solo mese corrente, usato in Riepilogo per il saldo di adesso)
 function pianiPendenti(now){ now=now||today(); const ym=dateISO(now).slice(0,7); return pianiDelMese(ym).filter(p=>Math.abs(pianoResiduoMese(p,ym))>0.005); }
 function allRules(){
@@ -1454,13 +1467,18 @@ function learn(r){
 function resetForm(){ F.amt=""; F.desc=""; $("desc").value=""; if($("catSearch")){ $("catSearch").value=""; $("catSearchBox").classList.remove("open"); } $("desc").placeholder="Es. Esselunga"; F.cat=""; F.conto=S.defConto; F.dOff=0; F.dCustom=""; $("dateIn").value=""; F.showAllCat=false; F.planId=null; closePad(); render(); }
 async function send(){
   const r=currentRow();
+  // inserito a mano ma corrisponde a un piano attivo: lo conto come quella ricorrenza, e se l'importo è cambiato chiedo
+  if(!F.planId){ const ym=r.DataISO.slice(0,7); const p=S.piani.find(x=>pianoAttivoNelMese(x,ym)&&norm(x.desc)===norm(r.Descrizione));
+    if(p){ const nuovo=Math.abs(r.Importo);
+      if(Math.abs(nuovo-p.imp)>0.5&&confirm(`L'importo è diverso da quello previsto dal piano "${p.desc}".\nVuoi aggiornare il piano da ${fmtIT(p.imp)} € a ${fmtIT(nuovo)} €?`)) p.imp=nuovo;
+      F.planId=p.id; } }
   haptic("ok"); let ok=true;
   S.rows.push({id:newId(),d:r.DataISO,desc:r.Descrizione,cat:r.Categoria,conto:r.Conto,imp:r.Importo,planId:F.planId||null}); syncLocal();
   S.log.unshift({...r,ts:Date.now(),ok}); S.log=S.log.slice(0,60);
   learn(r);
   if(F.planId){ const p=S.piani.find(x=>x.id===F.planId); if(p){ p.fatte=(p.fatte||0)+1; if(pianoScaduto(p)) p.attivo=false; } }
   save();
-  toast(`Registrato: ${r.Descrizione} ${r.ImportoIT} €`);
+  toast(r.DataISO>dateISO(today())?`Registrato come futuro: diventa effettivo il ${r.Data}`:`Registrato: ${r.Descrizione} ${r.ImportoIT} €`);
   if(r.Importo>0) moneyRain(); else moneyAway(Math.abs(r.Importo));
   resetForm(); flashMovimento(r);
 }
@@ -1601,17 +1619,22 @@ function mergeStorico(st){
 function budgetOf(c){ const o=S.budget&&S.budget[c.name]; return (typeof o==="number")?o:c.budget; }
 function calc(){
   let C=S.cache; if(!C) return null;
-  const rows=C.rows; const now=today(); const yearNow=now.getFullYear();
+  const now=today(); const yearNow=now.getFullYear(); const oggiISO=dateISO(now);
+  // solo ciò che è già successo: i movimenti con data futura restano previsioni
+  const rows=C.rows.filter(r=>r.d<=oggiISO);
   const cats=C.cats.map(c=>({...c,budget:budgetOf(c)})); C={...C,cats};
   const catInfo={}; for(const c of C.cats) catInfo[c.name]=c;
   const tipoOf=cat=>(catInfo[cat]||{}).tipo||"Spesa";
   const sum=f=>rows.reduce((a,r)=>f(r)?a+r.imp:a,0);
-  // carte: spese già addebitate (il 15 del mese successivo) e pendenze divise per mese
+  // carte: la spesa conta una volta sola quando la fai; l'addebito sul conto è solo un regolamento
   const cardAccounts=[...C.accounts.filter(a=>a.addebita),...CARTE_EXTRA.filter(x=>!C.accounts.some(a=>a.name===x.name))];
   const cards=cardAccounts.map(c=>{ let settled=0; const pend=[]; const gg=c.giorno||GIORNO_ADDEBITO[c.name]||15, lag=c.ritardo||MESI_RITARDO[c.name]||1;
-    for(let m=0;m<12;m++){ const spend=sum(r=>r.conto===c.name&&r.d.startsWith(`${yearNow}-${pad2(m+1)}`)); const addebito=new Date(yearNow,m+lag,gg);
-      if(now>=addebito) settled+=spend; else if(Math.abs(spend)>0.004) pend.push({mese:MESI[m],due:addebito,amount:spend}); }
-    const total=sum(r=>r.conto===c.name); return {...c,giorno:gg,settled,pend,daAddebitare:total-settled}; });
+    const byM={}; rows.filter(r=>r.conto===c.name).forEach(r=>{ const k=r.d.slice(0,7); byM[k]=(byM[k]||0)+r.imp; });
+    Object.keys(byM).sort().forEach(k=>{ const [y,m]=k.split("-").map(Number), spend=byM[k]; const addebito=cardDue(c,k);
+      if(now>=addebito) settled+=spend; else if(Math.abs(spend)>0.004) pend.push({mese:MESI[m-1]+(y!==yearNow?" "+y:""),due:addebito,amount:spend}); });
+    const preg=-(c.saldo0||0);
+    if(Math.abs(preg)>0.004){ const due=fromISO(c.pregressoData||oggiISO); if(now>=due) settled+=preg; else pend.unshift({mese:"pregresso",pregresso:true,due,amount:preg}); }
+    const total=sum(r=>r.conto===c.name)+preg; return {...c,giorno:gg,settled,pend,daAddebitare:total-settled}; });
   // saldi conto = saldo iniziale + movimenti + addebiti già passati delle carte collegate
   const liquid=C.accounts.filter(a=>!a.addebita&&!cardAccounts.some(c=>c.name===a.name)).map(a=>({...a,saldo:a.saldo0+sum(r=>r.conto===a.name)+cards.filter(c=>c.addebita===a.name).reduce((x,c)=>x+c.settled,0)}));
   const trasfCredito=-sum(r=>r.cat===CAT_TRASFERTE);
@@ -1993,17 +2016,18 @@ function renderRp(){
   const SCx=serieComposizione(); const prevPt=SCx?[...SCx.pts].reverse().find(p=>p.kind==="hist"&&p.d<dateISO(today()).slice(0,7)+"-02"&&p.liq!=null):null;
   const dLiq=prevPt?D.liquidita-prevPt.liq:null, dAss=prevPt?D.assetTot-prevPt.asset:null;
   const delta=v=>v==null?"":`<em class="dv ${v>=0?"up":"down"}">${v>=0?"+":"−"}${fmt0(Math.abs(v))} € sul mese scorso</em>`;
-  h+=`<div class="grid3"><div><small>Liquidità</small><b><span class="cnt" data-v="${D.liquidita}">${fmt0(D.liquidita)}</span> €</b>${delta(dLiq)}</div><div><small>Carte da addebitare</small><b><span class="cnt" data-v="${D.carteTot}">${fmt0(D.carteTot)}</span> €</b></div><div><small>Asset</small><b><span class="cnt" data-v="${D.assetTot}">${fmt0(D.assetTot)}</span> €</b>${delta(dAss)}</div>${D.trasferte.credito>0.005?`<div><small>Crediti trasferte</small><b>${fmt0(D.trasferte.credito)} €</b></div>`:""}</div></div>`;
+  h+=`<div class="grid3"><div><small>Liquidità</small><b><span class="cnt" data-v="${D.liquidita}">${fmt0(D.liquidita)}</span> €</b>${delta(dLiq)}</div><div><small>Carte da addebitare</small><b><span class="cnt" data-v="${D.carteTot}">${fmt0(D.carteTot)}</span> €</b></div><div><small>Asset</small><b><span class="cnt" data-v="${D.assetTot}">${fmt0(D.assetTot)}</span> €</b>${delta(dAss)}</div>${(()=>{ const sp=spendibile(D); return `<div><small>Spendibile</small><b><span class="cnt" data-v="${sp}">${fmt0(sp)}</span> €</b><em class="dv">${fmt0(Math.max(0,sp)/giorniRimasti())} €/giorno fino a fine mese</em></div>`; })()}${D.trasferte.credito>0.005?`<div><small>Crediti trasferte</small><b>${fmt0(D.trasferte.credito)} €</b></div>`:""}</div></div>`;
   h+=`<div class="sync">${S.rows.length} movimenti salvati su questo telefono</div>`;
+  const CF=isCur?cashflow(90):null; if(CF) h+=lowestHTML(CF,false);
   // mese
   const previstoMese=previstoResiduoMese(R.month), speseAttese=Math.max(0,-previstoMese);
   h+=`<div class="card"><div class="mnav"><button id="mPrev">‹</button><b>${monthLabel(R.month)}</b><button id="mNext">›</button></div>
     <div class="kpi"><div><small>Entrate</small><b><span class="cnt" data-v="${M.entrate}">${fmt0(M.entrate)}</span> €</b></div><div><small>Spese effettive</small><b><span class="cnt" data-v="${M.spese}">${fmt0(M.spese)}</span> €</b></div><div><small>Investiti</small><b><span class="cnt" data-v="${M.investiti}">${fmt0(M.investiti)}</span> €</b></div><div><small>Risparmio · ${Math.round(M.tasso*100)}%</small><b><span class="cnt" data-v="${M.risparmio}">${fmt0(M.risparmio)}</span> €</b></div>${speseAttese>0.005?`<div><small>Spese previste</small><b><span class="cnt" data-v="${speseAttese}">${fmt0(speseAttese)}</span> €</b></div>`:""}</div></div>`;
   // spese previste in questo mese: ricorrenti + una tantum (qualunque mese si stia sfogliando)
-  { const pMese=pianiDelMese(R.month);
-    if(pMese.length){
+  { const pMese=pianiDelMese(R.month), fut=righeFuture(R.month);
+    if(pMese.length||fut.length){
       const tot=previstoMese;
-      h+=`<div class="card"><h3>Spese previste<small>${monthLabel(R.month)}</small></h3><ul class="rows">${pMese.map(p=>{
+      h+=`<div class="card"><h3>Spese previste<small>${monthLabel(R.month)}</small></h3><ul class="rows">${fut.map(r=>`<li><span>${esc(r.desc)}<small>futuro · ${dateIT(fromISO(r.d))}</small></span><b class="${r.imp>0?"in":""}">${r.imp>=0?"+":"−"}${fmtIT(Math.abs(r.imp))} €</b></li>`).join("")}${pMese.map(p=>{
         const n=occorrenzeMese(p,R.month), fatto=confermatoNelMeseImp(p,R.month), resid=pianoResiduoMese(p,R.month);
         if(Math.abs(resid)<0.005) return `<li><span>${esc(p.desc)}<small>confermata ✓</small></span><b></b></li>`;
         const stato=Math.abs(fatto)>0.005?"parzialmente confermata":"";
@@ -2025,8 +2049,8 @@ function renderRp(){
   h+=`</div>`;
   // saldi
   h+=`<div class="card"><h3>Saldo per conto</h3><ul class="rows">${D.saldi.map(a=>`<li><span>${esc(lbl(a.name))}</span><b>${fmtIT(a.saldo)} €</b></li>`).join("")}<li class="tot"><span>Totale liquidità</span><b>${fmtIT(D.liquidita)} €</b></li>${D.carte.map(c=>{
-    if(c.pend.length) return c.pend.map(p=>`<li><span>${esc(lbl(c.name))} · spese di ${p.mese.toLowerCase()}<small>addebito su ${esc(lbl(c.addebita))} il ${dateIT(p.due)}</small></span><b>${fmtIT(p.amount)} €</b></li>`).join("");
-    const prev=pianiDelMese(R.month).filter(p=>p.conto===c.name).reduce((a,p)=>a+pianoResiduoMese(p,R.month),0);
+    const prev=pianiDelMese(R.month).filter(p=>p.conto===c.name).reduce((a,p)=>a+pianoResiduoMese(p,R.month),0)+righeFuture(R.month).filter(r=>r.conto===c.name).reduce((a,r)=>a+r.imp,0);
+    if(c.pend.length) return c.pend.map(p=>`<li><span>${esc(lbl(c.name))} · ${p.pregresso?"saldo pregresso":"spese di "+p.mese.toLowerCase()}<small>addebito su ${esc(lbl(c.addebita))} il ${dateIT(p.due)}</small></span><b>${fmtIT(p.amount)} €</b></li>`).join("")+(Math.abs(prev)>0.005?`<li><span>${esc(lbl(c.name))} · previsto ${monthLabel(R.month).toLowerCase()}<small>ricorrenti e futuri non ancora effettivi</small></span><b>${fmtIT(prev)} €</b></li>`:"");
     if(Math.abs(prev)>0.005) return `<li><span>${esc(lbl(c.name))}<small>previsto per ${monthLabel(R.month).toLowerCase()}, non ancora confermato</small></span><b>${fmtIT(prev)} €</b></li>`;
     return `<li><span>${esc(lbl(c.name))}<small>nessuna spesa da addebitare</small></span><b>0,00 €</b></li>`;
   }).join("")}</ul></div>`;
@@ -2045,6 +2069,7 @@ function renderRp(){
   { const oc=$("outCard"); if(oc&&oc.querySelector(".donutwrap")) bindDonut(oc.querySelector(".donutwrap"),items,M.spese,"Spese"); const ic=$("inCard"); if(ic&&ic.querySelector(".donutwrap")) bindDonut(ic.querySelector(".donutwrap"),inItems,M.entrate,"Entrate"); }
   if(D.storico.length>=2){ const pc=$("patCard"); if(pc) pc._bound=false; initPat(D.storico); initComp(); initLines(); }
   const br=$("btnReport"); if(br) br.onclick=openReport;
+  if(CF) bindCf(CF);
   const bx=$("btnExportXlsx"); if(bx) bx.onclick=exportExcel;
 
   const bp=$("btnPacOpen"); if(bp) bp.onclick=openPac;
@@ -2343,7 +2368,8 @@ const NAV_ICONS={"main": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"curr
 
 function storiesUnseen(){ const o=today(), pm=new Date(o.getFullYear(),o.getMonth()-1,1); return S.storiesSeen!==`${pm.getFullYear()}-${pad2(pm.getMonth()+1)}`; }
 function markStoriesSeen(){ const o=today(), pm=new Date(o.getFullYear(),o.getMonth()-1,1); S.storiesSeen=`${pm.getFullYear()}-${pad2(pm.getMonth()+1)}`; save(); const h=$("hdr"); if(h){ const b=h.querySelector('button[data-go="stories"]'); if(b) b.classList.remove("new"); } }
-const NAV_ORDER=[["main","Nuovo"],["rp","Riepilogo"],["mv","Movimenti"],["fire","FIRE"],["stories","Storie"]];
+NAV_ICONS.bud="<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 7h15a3 3 0 0 1 3 3v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/><path d=\"M3 7l12-3v3\"/><circle cx=\"16.5\" cy=\"14\" r=\"1.3\"/></svg>";
+const NAV_ORDER=[["main","Nuovo"],["rp","Riepilogo"],["bud","Budget"],["mv","Movimenti"],["fire","FIRE"],["stories","Storie"]];
 function navHTML(active){
   return `<div class="navmini">${NAV_ORDER.map(([k,t])=>`<button data-go="${k}" class="${k===active?"on":""}${k==="stories"?" st"+(storiesUnseen()?" new":""):""}" aria-label="${t}">${k==="stories"?`<span class="stwrapi">${NAV_ICONS[k]}</span>`:NAV_ICONS[k]}<span>${t}</span></button>`).join("")}</div>`;
 }
@@ -2369,7 +2395,7 @@ function setActiveNav(active){
     else { ind.style.height=""; ind.style.width=b.offsetWidth+"px"; ind.style.transform=`translateX(${b.offsetLeft}px)`; } };
   place(); requestAnimationFrame(place);
 }
-const SHEETS=["sheetRp","sheetMv","sheetFire","sheetLog","sheetSettings","sheetPac","sheetRep","sheetPrezzi","sheetBudget","sheetConti","sheetCats","sheetPiani","sheetEdit"];
+const SHEETS=["sheetRp","sheetBud","sheetMv","sheetFire","sheetLog","sheetSettings","sheetPac","sheetRep","sheetPrezzi","sheetBudget","sheetConti","sheetCats","sheetPiani","sheetEdit"];
 function openSheet(id){
   const target=$(id); if(!target) return;
   SHEETS.forEach(sid=>{ const el=$(sid); if(!el||sid===id) return; if(el.classList.contains("open")){ el.classList.remove("open"); el.classList.add("leaving"); setTimeout(()=>el.classList.remove("leaving"),340); } });
@@ -2410,7 +2436,7 @@ document.querySelectorAll(".sheet").forEach(sh=>{ let x0=null,y0=null;
 function goTab(t){
   haptic(); setActiveNav(t);
   if(t==="main"){ SHEETS.forEach(sid=>{ const el=$(sid); if(el&&el.classList.contains("open")) el.classList.remove("open"); }); paintNav(); return; }
-  if(t==="rp") openRp(); else if(t==="mv") openMv(); else if(t==="stories"){ setActiveNav("main"); openStories(); } else if(t==="fire"){ openSheet("sheetFire"); renderFire(); if(S.share) doRefresh(false); }
+  if(t==="rp") openRp(); else if(t==="bud"){ syncLocal(); openSheet("sheetBud"); renderBud(); } else if(t==="mv") openMv(); else if(t==="stories"){ setActiveNav("main"); openStories(); } else if(t==="fire"){ openSheet("sheetFire"); renderFire(); if(S.share) doRefresh(false); }
   paintNav();
 }
 
@@ -2783,6 +2809,119 @@ async function exportExcel(){
   if(btn){ btn.disabled=false; btn.textContent="📊 Esporta Excel"; }
 }
 
+// ================= SPENDIBILE E BUDGET =================
+// Liquidità ≠ Spendibile ≠ Budget: lo spendibile è la liquidità libera dopo aver protetto
+// tutto il debito carte già maturato e le uscite note (piani, movimenti futuri) fino a fine mese.
+function giorniRimasti(){ const t=today(); return new Date(t.getFullYear(),t.getMonth()+1,0).getDate()-t.getDate()+1; }
+function impegniMese(){
+  const ym=dateISO(today()).slice(0,7);
+  return pianiDelMese(ym).reduce((a,p)=>a+Math.min(0,pianoResiduoMese(p,ym)),0)+righeFuture(ym).reduce((a,r)=>a+Math.min(0,r.imp),0);
+}
+function spendibile(D){ D=D||calc(); if(!D) return 0; return D.liquidita+Math.min(0,D.carteTot)+impegniMese(); }
+// spese discrezionali effettive del mese: esclusi piani (fisse), investimenti, trasferimenti, futuri
+function spesaDiscrezionale(ym){
+  const o=dateISO(today()); const tipo=c=>(S.cats.find(x=>x.name===c)||{}).tipo||"Spesa";
+  return -S.rows.filter(r=>r.d<=o&&r.d.slice(0,7)===ym&&!r.planId&&tipo(r.cat)==="Spesa").reduce((a,r)=>a+r.imp,0);
+}
+function renderBud(){
+  const body=$("budBody"); const D=calc(); if(!D){ body.innerHTML=""; return; }
+  const t=today(), ym=dateISO(t).slice(0,7), dim=new Date(t.getFullYear(),t.getMonth()+1,0).getDate(), gg=giorniRimasti();
+  const B=S.budgetDisc||0, speso=spesaDiscrezionale(ym), resid=B-speso;
+  const sp=spendibile(D), spG=Math.max(0,sp)/gg, teo=Math.max(0,resid)/gg;
+  const oggi=B>0?Math.min(teo,spG):spG;
+  let h=`<div class="hero"><div class="lbl">Oggi puoi spendere</div><div class="big"><span class="cnt" data-v="${oggi}">${fmt0(oggi)}</span> €</div>`;
+  if(!B) h+=`<div class="ytd">Nessun budget impostato: è il massimo senza toccare carte e impegni del mese</div>`;
+  else if(spG<teo) h+=`<div class="ytd">Limitato dalla liquidità: il budget da solo ti darebbe ${fmt0(teo)} €</div>`;
+  else h+=`<div class="ytd">Budget residuo diviso per i giorni che mancano, oggi incluso</div>`;
+  h+=`</div>`;
+  h+=`<div class="card"><ul class="rows">
+    ${B?`<li><span>Budget mensile</span><b>${fmtIT(B)} €</b></li><li><span>Speso<small>solo spese discrezionali effettive</small></span><b>${fmtIT(speso)} €</b></li><li><span>Budget residuo</span><b>${fmtIT(resid)} €</b></li>`:""}
+    <li><span>Spendibile reale<small>liquidità − carte da addebitare − uscite note fino a fine mese</small></span><b>${fmtIT(sp)} €</b></li>
+    <li><span>Giorni rimanenti<small>oggi incluso</small></span><b>${gg}</b></li></ul></div>`;
+  if(B>0){ const qT=t.getDate()/dim, qB=speso/B, diff=B*qT-speso;
+    h+=`<div class="card"><h3>Ritmo di spesa</h3><p style="margin:0 0 8px;font-size:14px;color:var(--ink-2)">È trascorso il ${Math.round(qT*100)}% del mese, hai consumato il ${Math.round(qB*100)}% del budget.</p>
+      <div class="bar"><i class="${qB>qT?"over":"ok"}" style="width:${Math.min(100,qB*100)}%"></i></div>
+      <p style="margin:10px 0 0;font-weight:600">${Math.abs(diff)<1?"Sei esattamente in linea con il ritmo previsto.":diff>0?`Sei ${fmt0(diff)} € sotto il ritmo previsto.`:`Sei ${fmt0(-diff)} € sopra il ritmo previsto.`}</p></div>`; }
+  const cf=cashflow(90);
+  if(cf) h+=lowestHTML(cf,true);
+  h+=`<div class="card"><h3>Budget discrezionale mensile</h3><p style="margin:0 0 10px;font-size:13.5px;color:var(--ink-2)">Il limite che ti dai per le spese non ricorrenti. Non conta piani, investimenti e trasferimenti.</p>
+    <div class="in2"><div><input id="budIn" inputmode="decimal" placeholder="Es. 1200" value="${B?String(B).replace(".",","):""}"></div><div><button class="btn" id="budSave" style="margin:0;width:100%">Salva</button></div></div></div>`;
+  body.innerHTML=h; animateCounts(body);
+  $("budSave").onclick=()=>{ const v=numIT2($("budIn").value); S.budgetDisc=isNaN(v)?0:Math.max(0,v); save(); renderBud(); toast(S.budgetDisc?"Budget salvato":"Budget rimosso"); };
+}
+
+// ================= CASH-FLOW FUTURO =================
+// Proiezione giorno per giorno della liquidità: movimenti futuri, ricorrenze non ancora confermate,
+// addebiti carte (pregresso incluso). Le spese su carta pesano sul conto il giorno dell'addebito.
+function cashflow(giorni){
+  const D=calc(); if(!D) return null;
+  const t=today(), oggi=dateISO(t), dOff=k=>dateISO(new Date(t.getFullYear(),t.getMonth(),t.getDate()+k)), fine=dOff(giorni);
+  const carte={}; S.accounts.filter(a=>a.addebita).forEach(a=>carte[a.name]=a);
+  const liquidi=new Set(D.saldi.map(a=>a.name));
+  const ev=[];
+  const add=(d,imp,desc)=>{ if(d<oggi) d=oggi; if(d<=fine&&Math.abs(imp)>0.004) ev.push({d,imp,desc}); };
+  const via=(conto,d,imp,desc)=>{ const c=carte[conto]; if(c) add(dateISO(cardDue(c,d.slice(0,7))),imp,desc); else if(liquidi.has(conto)) add(d,imp,desc); };
+  D.carte.forEach(c=>{ if(liquidi.has(c.addebita)) c.pend.forEach(p=>add(dateISO(p.due),p.amount,"Addebito "+lbl(c.name))); });
+  righeFuture().forEach(r=>via(r.conto,r.d,r.imp,r.desc));
+  const mesi=[]; for(let k=0;k<=Math.ceil(giorni/28)+1;k++) mesi.push(dateISO(new Date(t.getFullYear(),t.getMonth()+k,1)).slice(0,7));
+  S.piani.forEach(p=>{ if(p.attivo===false) return; const amt=pianoSignedAmt(p);
+    let resto=p.fine&&p.fine.tipo==="occorrenze"?Math.max(0,p.fine.n-(p.fatte||0)):Infinity;
+    if(p.type==="interval"){ const own=S.rows.filter(r=>r.planId===p.id).map(r=>r.d).sort(); let d=fromISO(own.length?own[own.length-1]:(p.inizio||oggi));
+      if(own.length) d.setDate(d.getDate()+(p.days||30));
+      while(dateISO(d)<=fine&&resto>0){ const s=dateISO(d); if((!p.inizio||s>=p.inizio)&&!(p.fine&&p.fine.tipo==="data"&&s>p.fine.d)){ via(p.conto,s,amt,p.desc); resto--; } d.setDate(d.getDate()+(p.days||30)); }
+      return; }
+    mesi.forEach(ym=>{ if(!pianoAttivoNelMese(p,ym)||resto<=0) return;
+      const [y,m]=ym.split("-").map(Number), dim=new Date(y,m,0).getDate(); let date=[];
+      if(p.type==="once") date=[p.data];
+      else if(p.type==="weekly"){ for(let d=1;d<=dim;d++) if(new Date(y,m-1,d).getDay()===(p.dow||0)) date.push(`${ym}-${pad2(d)}`); }
+      else date=[`${ym}-${pad2(Math.min(p.from||1,dim))}`];
+      const manca=Math.max(0,date.length-confermateNelMese(p,ym)); date.slice(date.length-manca).forEach(s=>{ if(resto>0){ via(p.conto,s,amt,p.desc); resto--; } }); }); });
+  ev.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+  let v=D.liquidita, i=0; const pts=[];
+  for(let k=0;k<=giorni;k++){ const d=dOff(k); while(i<ev.length&&ev[i].d<=d){ v+=ev[i].imp; i++; } pts.push({d,v}); }
+  let min=pts[0]; pts.forEach(p=>{ if(p.v<min.v) min=p; });
+  const cause={}; ev.filter(e=>e.d<=min.d&&e.imp<0).forEach(e=>{ cause[e.desc]=(cause[e.desc]||0)+e.imp; });
+  const entrate=S.piani.some(p=>p.attivo!==false&&pianoSignedAmt(p)>0);
+  return {pts,min,start:D.liquidita,top:Object.entries(cause).sort((a,b)=>a[1]-b[1]).slice(0,4),entrate};
+}
+function lowestHTML(cf,compatto){
+  const m=cf.min, oggi=m.d===cf.pts[0].d;
+  let h=`<div class="card"><h3>${m.v<0?"⚠️ ":""}Liquidità minima prevista<small>prossimi ${cf.pts.length-1} giorni</small></h3>
+    <div style="font-size:26px;font-weight:700;${m.v<0?"color:var(--warn)":""}">${fmtIT(m.v)} €</div>
+    <p style="margin:2px 0 8px;color:var(--ink-2);font-size:14px">${oggi?(cf.top.length?"oggi, contando le uscite già scadute e non ancora confermate":"oggi: nessuna uscita nota la fa scendere"):"il "+dateIT(fromISO(m.d))}${cf.top.length?" · cosa la fa scendere:":""}</p>`;
+  if(cf.top.length) h+=`<ul class="rows">${cf.top.map(([d,v])=>`<li><span>${esc(d)}</span><b>${fmtIT(v)} €</b></li>`).join("")}</ul>`;
+  if(!cf.entrate) h+=`<p style="margin:10px 0 0;font-size:13px;color:var(--ink-2)">Nessuna entrata prevista: se aggiungi lo stipendio come ricorrente (categoria Stipendio) la previsione smette di scendere e basta.</p>`;
+  if(!compatto) h+=cfChartHTML(cf);
+  return h+`</div>`;
+}
+const CF_W=320,CF_H=130,CF_P=8;
+function cfScale(cf){ const vs=cf.pts.map(p=>p.v), lo=Math.min(...vs), hi=Math.max(...vs), pad=(hi-lo)*0.12||Math.abs(hi)*0.05||1, y0=lo-pad, y1=hi+pad, n=cf.pts.length-1;
+  return {n,X:i=>CF_P+i*(CF_W-2*CF_P)/n,Y:v=>CF_P+(CF_H-2*CF_P)*(1-(v-y0)/(y1-y0))}; }
+function cfChartHTML(cf){
+  const {n,X,Y}=cfScale(cf), mi=cf.pts.indexOf(cf.min);
+  const d=cf.pts.map((p,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(p.v).toFixed(1)).join("");
+  return `<div style="position:relative;margin-top:12px"><svg id="cfSvg" viewBox="0 0 ${CF_W} ${CF_H}" style="width:100%;height:auto;display:block;touch-action:pan-y;overflow:visible" role="img" aria-label="Liquidità prevista nei prossimi ${n} giorni, minimo ${fmtIT(cf.min.v)} euro il ${dateIT(fromISO(cf.min.d))}">
+    <line x1="${CF_P}" x2="${CF_W-CF_P}" y1="${Y(cf.start).toFixed(1)}" y2="${Y(cf.start).toFixed(1)}" stroke="var(--line)" stroke-dasharray="3 3"/>
+    <path d="${d}" fill="none" stroke="var(--go)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${X(mi).toFixed(1)}" cy="${Y(cf.min.v).toFixed(1)}" r="5" fill="var(--warn)" stroke="var(--surface)" stroke-width="2"/>
+    <text x="${CF_P}" y="${(Y(cf.start)-5).toFixed(1)}" font-size="10" fill="var(--ink-2)">${fmt0(cf.start)} € oggi</text>
+    ${mi>0?`<text x="${Math.min(X(mi),CF_W-CF_P).toFixed(1)}" y="${Math.min(Y(cf.min.v)+16,CF_H).toFixed(1)}" font-size="10" fill="var(--ink-2)" text-anchor="${X(mi)>CF_W*0.7?"end":"middle"}">min ${fmt0(cf.min.v)} €</text>`:""}
+    <line id="cfX" y1="${CF_P}" y2="${CF_H-CF_P}" stroke="var(--ink-2)" stroke-width="1" opacity="0"/>
+    <circle id="cfDot" r="4.5" fill="var(--go)" stroke="var(--surface)" stroke-width="2" opacity="0"/>
+    <rect x="0" y="0" width="${CF_W}" height="${CF_H}" fill="transparent" id="cfHit"/></svg>
+    <div id="cfTip" hidden style="position:absolute;top:-6px;transform:translate(-50%,-100%);background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:12.5px;white-space:nowrap;pointer-events:none"></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-2);margin-top:4px"><span>oggi</span><span>+${Math.round(n/3)} gg</span><span>+${Math.round(2*n/3)} gg</span><span>+${n} gg</span></div>
+    <p style="margin:6px 0 0;font-size:12px;color:var(--ink-2)">Tratteggio: liquidità di oggi · punto rosso: minimo. Tocca il grafico per i valori.</p></div>`;
+}
+function bindCf(cf){
+  const svg=$("cfSvg"); if(!svg) return; const {n,X,Y}=cfScale(cf), tip=$("cfTip"), xl=$("cfX"), dot=$("cfDot");
+  const show=e=>{ const r=svg.getBoundingClientRect(); const x=(e.clientX-r.left)/r.width*CF_W; const i=Math.max(0,Math.min(n,Math.round((x-CF_P)/(CF_W-2*CF_P)*n))); const p=cf.pts[i];
+    xl.setAttribute("x1",X(i)); xl.setAttribute("x2",X(i)); xl.setAttribute("opacity",".5"); dot.setAttribute("cx",X(i)); dot.setAttribute("cy",Y(p.v)); dot.setAttribute("opacity","1");
+    tip.hidden=false; tip.textContent=`${dateIT(fromISO(p.d))} · ${fmtIT(p.v)} €`; tip.style.left=(X(i)/CF_W*100)+"%"; tip.style.top=(Y(p.v)/CF_H*r.height-8)+"px"; };
+  const hide=()=>{ tip.hidden=true; xl.setAttribute("opacity","0"); dot.setAttribute("opacity","0"); };
+  svg.addEventListener("pointermove",show); svg.addEventListener("pointerdown",show); svg.addEventListener("pointerleave",hide);
+}
+
 // ================= FIRE =================
 const FIRE_DEF={mode:"proj",cap:null,pac:null,rate:7,infl:2,spesa:null,swr:4,anni:20,base:"asset"};
 function fireCfg(){ if(!S.fire) S.fire={...FIRE_DEF}; else for(const k in FIRE_DEF) if(!(k in S.fire)) S.fire[k]=FIRE_DEF[k]; return S.fire; }
@@ -2967,7 +3106,8 @@ function renderMv(){
     const shown=rows.slice(0,MV.limit);
     for(const r of shown){ if(r.d!==day){ if(day)h+=`</ul>`; day=r.d; h+=`<div class="day">${fromISO(r.d).toLocaleDateString("it-IT",{weekday:"short",day:"numeric",month:"long"})}</div><ul class="list">`; }
       const ci=(C.cats.find(c=>c.name===r.cat)||{}); const col=PALETTE[[...r.cat].reduce((a,ch)=>a+ch.charCodeAt(0),0)%PALETTE.length];
-      h+=`<li data-id="${r.id||""}" class="mvrow"><span class="cico" style="background:${col}">${ci.emoji||"•"}</span><span class="txt"><b>${esc(r.desc)}</b><small>${esc(r.cat)} · ${esc(lbl(r.conto))}</small></span><span class="v ${r.imp>0?"in":""}">${fmtIT(r.imp)} €</span></li>`; }
+      const fut=r.d>dateISO(today());
+      h+=`<li data-id="${r.id||""}" class="mvrow"${fut?' style="opacity:.75"':""}><span class="cico" style="background:${col}">${ci.emoji||"•"}</span><span class="txt"><b>${esc(r.desc)}</b><small>${esc(r.cat)} · ${esc(lbl(r.conto))}${fut?" · futuro, non ancora effettivo":""}</small></span><span class="v ${r.imp>0?"in":""}">${fmtIT(r.imp)} €</span></li>`; }
     h+=`</ul>`;
     if(rows.length>MV.limit) h+=`<button class="more2" id="mvMore">Mostra altri ${Math.min(60,rows.length-MV.limit)} (di ${rows.length-MV.limit})</button>`;
   }
@@ -3035,7 +3175,8 @@ function paintConti(){
       <div class="in2"><div><label>Nome</label><input data-f="name" data-i="${i}" value="${esc(a.name)}"></div><div><label>${carta?"Già da addebitare €":"Saldo iniziale €"}</label><input data-f="saldo0" data-i="${i}" inputmode="decimal" value="${String(a.saldo0||0).replace(".",",")}"></div></div>
       <div class="in2"><div><label>Tipo</label><select data-f="tipo" data-i="${i}"><option value="conto" ${carta?"":"selected"}>Conto / contanti</option><option value="carta" ${carta?"selected":""}>Carta di credito</option></select></div>
       ${carta?`<div><label>Addebitata su</label><select data-f="addebita" data-i="${i}">${banks.map(b=>`<option ${b===a.addebita?"selected":""}>${esc(b)}</option>`).join("")}</select></div>`:"<div></div>"}</div>
-      ${carta?`<div class="in2"><div><label>Giorno di addebito</label><input data-f="giorno" data-i="${i}" inputmode="numeric" value="${a.giorno||15}"></div><div><label>Addebito</label><select data-f="ritardo" data-i="${i}">${[1,2,3].map(n=>`<option value="${n}" ${n===(a.ritardo||1)?"selected":""}>${n===1?"il mese dopo":n+" mesi dopo"}</option>`).join("")}</select></div></div>`:""}
+      ${carta?`<div class="in2"><div><label>Giorno di addebito</label><input data-f="giorno" data-i="${i}" inputmode="numeric" value="${a.giorno||15}"></div><div><label>Addebito</label><select data-f="ritardo" data-i="${i}">${[1,2,3].map(n=>`<option value="${n}" ${n===(a.ritardo||1)?"selected":""}>${n===1?"il mese dopo":n+" mesi dopo"}</option>`).join("")}</select></div></div>
+      <div class="in2"><div><label>Pregresso addebitato il</label><input type="date" data-f="pregressoData" data-i="${i}" value="${a.pregressoData||prossimoGiorno(a.giorno||15)}"></div><div style="font-size:12.5px;opacity:.7;align-self:end">Spese fatte prima di usare l'app: non toccano la liquidità fino a questa data</div></div>`:""}
     </div>`; }).join("");
   $("contiRows").querySelectorAll("[data-f]").forEach(el=>el.onchange=el.oninput=()=>{ const a=CONTI_DRAFT[+el.dataset.i], f=el.dataset.f;
     if(f==="tipo"){ if(el.value==="carta"){ const b=banks.find(x=>x!==a.name); if(!b){ el.value="conto"; return toast("Serve prima un conto su cui addebitarla",true); } a.addebita=b; a.giorno=a.giorno||15; a.ritardo=a.ritardo||1; } else a.addebita=""; paintConti(); return; }
@@ -3049,7 +3190,7 @@ $("contiSave").onclick=()=>{
   const names=CONTI_DRAFT.map(a=>a.name.trim()); if(!names.length) return toast("Serve almeno un conto",true); if(names.some(n=>!n)) return toast("Ogni conto deve avere un nome",true);
   if(new Set(names.map(norm)).size!==names.length) return toast("Due conti hanno lo stesso nome",true);
   CONTI_DRAFT.forEach(a=>{ a.name=a.name.trim(); if(a._old&&a._old!==a.name){ renameInRows("conto",a._old,a.name); CONTI_DRAFT.forEach(b=>{ if(b.addebita===a._old) b.addebita=a.name; }); if(S.defConto===a._old) S.defConto=a.name; } });
-  S.accounts=CONTI_DRAFT.map(({_old,...a})=>a); if(!S.accounts.some(a=>a.name===S.defConto)) S.defConto=(S.accounts.find(a=>!a.addebita)||S.accounts[0]||{}).name||"";
+  S.accounts=CONTI_DRAFT.map(({_old,...a})=>a); fissaPregresso(S.accounts); if(!S.accounts.some(a=>a.name===S.defConto)) S.defConto=(S.accounts.find(a=>!a.addebita)||S.accounts[0]||{}).name||"";
   save(); syncLocal(); F.conto=S.defConto; render(); renderSettings(); openSheet("sheetSettings"); toast("Conti salvati");
 };
 let CATS_DRAFT=null;
