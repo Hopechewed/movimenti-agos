@@ -1239,17 +1239,19 @@ function pianoScaduto(p,now){
 }
 function pianoAttivo(p,now){ return p.attivo!==false && !pianoScaduto(p,now); }
 function pianoHint(p){
+  if(p.type==="once") return `una tantum il ${dateIT(fromISO(p.data||dateISO(today())))}`;
   const base=p.type==="weekly"?`ogni ${DOW[p.dow]}`:p.type==="interval"?`ogni ${p.days} giorni`:(p.from>=25?"a fine mese":`verso il ${p.from} del mese`);
   if(p.fine&&p.fine.tipo==="occorrenze") return `${base} · ${p.fatte||0}/${p.fine.n}`;
   if(p.fine&&p.fine.tipo==="data") return `${base} · fino al ${dateIT(fromISO(p.fine.d))}`;
   return base;
 }
-function piano2rule(p){ return {id:"piano:"+p.id,planId:p.id,piano:true,type:p.type,from:p.from,dow:p.dow,days:p.days,desc:p.desc,cat:p.cat,conto:p.conto,imp:p.imp,hint:pianoHint(p)}; }
+function piano2rule(p){ return {id:"piano:"+p.id,planId:p.id,piano:true,type:p.type,from:p.from,dow:p.dow,days:p.days,data:p.data,desc:p.desc,cat:p.cat,conto:p.conto,imp:p.imp,hint:pianoHint(p)}; }
 // ---------- saldo previsionale: spese ricorrenti già previste ma non ancora confermate ----------
 function pianoSignedAmt(p){ const tipo=(S.cats.find(c=>c.name===p.cat)||{}).tipo||"Spesa"; return tipo==="Entrata"?p.imp:-p.imp; }
 function pianoInScadenza(p,now){ return p.type==="monthly"?now.getDate()>=(p.from||1):true; }
 // quante volte ricorre p nel mese ym (YYYY-MM)
 function occorrenzeMese(p,ym){
+  if(p.type==="once") return (p.data&&p.data.slice(0,7)===ym)?1:0;
   const [y,m]=ym.split("-").map(Number); const dim=new Date(y,m,0).getDate();
   if(p.type==="weekly"){ let n=0; for(let d=1;d<=dim;d++) if(new Date(y,m-1,d).getDay()===(p.dow||0)) n++; return n; }
   if(p.type==="interval") return Math.max(0,Math.floor(dim/(p.days||30)));
@@ -1258,6 +1260,7 @@ function occorrenzeMese(p,ym){
 // il piano è attivo (anche solo in parte) durante il mese ym, indipendentemente da "oggi"
 function pianoAttivoNelMese(p,ym){
   if(p.attivo===false) return false;
+  if(p.type==="once") return !!(p.data&&p.data.slice(0,7)===ym);
   if(p.inizio&&p.inizio.slice(0,7)>ym) return false;
   if(p.fine&&p.fine.tipo==="data"&&p.fine.d&&p.fine.d.slice(0,7)<ym) return false;
   return true;
@@ -1297,6 +1300,7 @@ function isDue(rule,now,H){
     return !h.some(e=>fromISO(e.d)>=weekStart);
   }
   if(rule.type==="interval"){ if(!l) return true; return daysBetween(fromISO(l.d),now)>=rule.days-2; }
+  if(rule.type==="once"){ if(!rule.data||dateISO(now)<rule.data) return false; return !h.some(e=>e.d>=rule.data); }
   return false;
 }
 function dueNow(){ const now=today(); const H=allHist(); return allRules().filter(r=>isDue(r,now,H)); }
@@ -1992,15 +1996,17 @@ function renderRp(){
   h+=`<div class="grid3"><div><small>Liquidità</small><b><span class="cnt" data-v="${D.liquidita}">${fmt0(D.liquidita)}</span> €</b>${delta(dLiq)}</div><div><small>Carte da addebitare</small><b><span class="cnt" data-v="${D.carteTot}">${fmt0(D.carteTot)}</span> €</b></div><div><small>Asset</small><b><span class="cnt" data-v="${D.assetTot}">${fmt0(D.assetTot)}</span> €</b>${delta(dAss)}</div>${D.trasferte.credito>0.005?`<div><small>Crediti trasferte</small><b>${fmt0(D.trasferte.credito)} €</b></div>`:""}</div></div>`;
   h+=`<div class="sync">${S.rows.length} movimenti salvati su questo telefono</div>`;
   // mese
+  const previstoMese=previstoResiduoMese(R.month), speseAttese=Math.max(0,-previstoMese);
   h+=`<div class="card"><div class="mnav"><button id="mPrev">‹</button><b>${monthLabel(R.month)}</b><button id="mNext">›</button></div>
-    <div class="kpi"><div><small>Entrate</small><b><span class="cnt" data-v="${M.entrate}">${fmt0(M.entrate)}</span> €</b></div><div><small>Spese</small><b><span class="cnt" data-v="${M.spese}">${fmt0(M.spese)}</span> €</b></div><div><small>Investiti</small><b><span class="cnt" data-v="${M.investiti}">${fmt0(M.investiti)}</span> €</b></div><div><small>Risparmio · ${Math.round(M.tasso*100)}%</small><b><span class="cnt" data-v="${M.risparmio}">${fmt0(M.risparmio)}</span> €</b></div></div></div>`;
-  // spese ricorrenti previste in questo mese (qualunque mese si stia sfogliando)
+    <div class="kpi"><div><small>Entrate</small><b><span class="cnt" data-v="${M.entrate}">${fmt0(M.entrate)}</span> €</b></div><div><small>Spese effettive</small><b><span class="cnt" data-v="${M.spese}">${fmt0(M.spese)}</span> €</b></div><div><small>Investiti</small><b><span class="cnt" data-v="${M.investiti}">${fmt0(M.investiti)}</span> €</b></div><div><small>Risparmio · ${Math.round(M.tasso*100)}%</small><b><span class="cnt" data-v="${M.risparmio}">${fmt0(M.risparmio)}</span> €</b></div>${speseAttese>0.005?`<div><small>Spese previste</small><b><span class="cnt" data-v="${speseAttese}">${fmt0(speseAttese)}</span> €</b></div>`:""}</div></div>`;
+  // spese previste in questo mese: ricorrenti + una tantum (qualunque mese si stia sfogliando)
   { const pMese=pianiDelMese(R.month);
     if(pMese.length){
-      const tot=previstoResiduoMese(R.month);
-      h+=`<div class="card"><h3>Spese ricorrenti<small>${monthLabel(R.month)}</small></h3><ul class="rows">${pMese.map(p=>{
+      const tot=previstoMese;
+      h+=`<div class="card"><h3>Spese previste<small>${monthLabel(R.month)}</small></h3><ul class="rows">${pMese.map(p=>{
         const n=occorrenzeMese(p,R.month), fatto=confermatoNelMeseImp(p,R.month), resid=pianoResiduoMese(p,R.month);
-        const stato=Math.abs(resid)<0.005?"confermata":(Math.abs(fatto)>0.005?"parzialmente confermata":"");
+        if(Math.abs(resid)<0.005) return `<li><span>${esc(p.desc)}<small>confermata ✓</small></span><b></b></li>`;
+        const stato=Math.abs(fatto)>0.005?"parzialmente confermata":"";
         return `<li><span>${esc(p.desc)}${n>1?` <small>×${n}</small>`:""}${stato?` <small>${stato}</small>`:""}</span><b class="${resid>0.005?"in":""}">${resid>=0?"+":"−"}${fmtIT(Math.abs(resid))} €</b></li>`;
       }).join("")}<li class="tot"><span>Ancora da confermare</span><b class="${tot>0.005?"in":""}">${tot>=0?"+":"−"}${fmtIT(Math.abs(tot))} €</b></li></ul></div>`;
     }
@@ -2018,7 +2024,12 @@ function renderRp(){
     h+=`<ul class="rows" style="margin-top:10px">${M.byCat.map(c=>expLi(c.name,`<span>${c.emoji?c.emoji+" ":""}${esc(c.name)}${c.budget?`<small>budget ${fmt0(c.budget)} € · ${Math.round(c.speso/c.budget*100)}%</small><div class="bar"><i class="${c.speso>c.budget?"over":""}" style="width:${Math.min(100,c.speso/c.budget*100)}%"></i></div>`:`<small>nessun budget</small>`}</span>`,`<b>${fmtIT(c.speso)} €</b>`)).join("")}</ul>`; }
   h+=`</div>`;
   // saldi
-  h+=`<div class="card"><h3>Saldo per conto</h3><ul class="rows">${D.saldi.map(a=>`<li><span>${esc(lbl(a.name))}</span><b>${fmtIT(a.saldo)} €</b></li>`).join("")}<li class="tot"><span>Totale liquidità</span><b>${fmtIT(D.liquidita)} €</b></li>${D.carte.map(c=>c.pend.length?c.pend.map(p=>`<li><span>${esc(lbl(c.name))} · spese di ${p.mese.toLowerCase()}<small>addebito su ${esc(lbl(c.addebita))} il ${dateIT(p.due)}</small></span><b>${fmtIT(p.amount)} €</b></li>`).join(""):`<li><span>${esc(lbl(c.name))}<small>nessuna spesa da addebitare</small></span><b>0,00 €</b></li>`).join("")}</ul></div>`;
+  h+=`<div class="card"><h3>Saldo per conto</h3><ul class="rows">${D.saldi.map(a=>`<li><span>${esc(lbl(a.name))}</span><b>${fmtIT(a.saldo)} €</b></li>`).join("")}<li class="tot"><span>Totale liquidità</span><b>${fmtIT(D.liquidita)} €</b></li>${D.carte.map(c=>{
+    if(c.pend.length) return c.pend.map(p=>`<li><span>${esc(lbl(c.name))} · spese di ${p.mese.toLowerCase()}<small>addebito su ${esc(lbl(c.addebita))} il ${dateIT(p.due)}</small></span><b>${fmtIT(p.amount)} €</b></li>`).join("");
+    const prev=pianiDelMese(R.month).filter(p=>p.conto===c.name).reduce((a,p)=>a+pianoResiduoMese(p,R.month),0);
+    if(Math.abs(prev)>0.005) return `<li><span>${esc(lbl(c.name))}<small>previsto per ${monthLabel(R.month).toLowerCase()}, non ancora confermato</small></span><b>${fmtIT(prev)} €</b></li>`;
+    return `<li><span>${esc(lbl(c.name))}<small>nessuna spesa da addebitare</small></span><b>0,00 €</b></li>`;
+  }).join("")}</ul></div>`;
   // investimenti
   h+=`<div class="card"><h3>Investimenti e asset<small>${D.livePrices?`<span class="live">prezzi live</span>`:(D.assetDate?"al "+dateIT(fromISO(D.assetDate)):"")}</small></h3><ul class="rows">${D.assets.map(a=>`<li><span>${esc(a.name)}${a.qty!=null?`<small>${a.qty.toLocaleString("it-IT",{maximumFractionDigits:4})} × ${fmtIT(a.price)} €${a.live?" · live":""}</small>`:""}</span><b>${fmtIT(a.value)} €</b></li>`).join("")}<li class="tot"><span>Totale asset</span><b>${fmtIT(D.assetTot)} €</b></li></ul><div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="btnPrezziOpen" style="flex:1;margin:0">✎ Aggiorna valori</button></div></div>`;
   // confronto mesi
@@ -2923,28 +2934,48 @@ function mvRows(){
   return rows.filter(r=> (!MV.tipo||(MV.tipo==="in"?r.imp>0:r.imp<0)) && (!MV.month||r.d.startsWith(MV.month)) && (!MV.cat||r.cat===MV.cat) && (!MV.conto||r.conto===MV.conto) && (!q||norm(r.desc).includes(q)) )
     .sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0);
 }
+function mvMesiDisponibili(){
+  const set=new Set(S.rows.map(r=>r.d.slice(0,7))); const t=today();
+  for(let i=-12;i<=12;i++) set.add(dateISO(new Date(t.getFullYear(),t.getMonth()+i,1)).slice(0,7));
+  return [...set].sort().reverse();
+}
+function mvPassaFiltri(r){
+  const q=norm(MV.q);
+  return (!MV.tipo||(MV.tipo==="in"?r.imp>0:r.imp<0)) && (!MV.cat||r.cat===MV.cat) && (!MV.conto||r.conto===MV.conto) && (!q||norm(r.desc).includes(q));
+}
+function mvVirtualRows(){
+  if(!MV.month) return [];
+  return pianiDelMese(MV.month).filter(p=>Math.abs(pianoResiduoMese(p,MV.month))>0.005)
+    .map(p=>({d:MV.month+"-01",desc:p.desc,cat:p.cat,conto:p.conto,imp:pianoResiduoMese(p,MV.month),virtual:true})).filter(mvPassaFiltri);
+}
 function renderMv(){
   const C=S.cache; if(!C) return;
-  const months=[...new Set(C.rows.map(r=>r.d.slice(0,7)))].sort().reverse();
-  $("mvMonth").innerHTML=`<button class="${MV.month?"":"on"}" data-m="">Tutti</button>`+months.slice(0,18).map(m=>`<button class="${MV.month===m?"on":""}" data-m="${m}">${MESI_S[+m.slice(5,7)-1]} ${m.slice(2,4)}</button>`).join("");
+  const months=mvMesiDisponibili();
+  $("mvMonth").innerHTML=`<button class="${MV.month?"":"on"}" data-m="">Tutti</button>`+months.slice(0,25).map(m=>`<button class="${MV.month===m?"on":""}" data-m="${m}">${MESI_S[+m.slice(5,7)-1]} ${m.slice(2,4)}</button>`).join("");
   $("mvMonth").querySelectorAll("button").forEach(b=>b.onclick=()=>{ MV.month=b.dataset.m||null; MV.limit=60; renderMv(); });
-  const cats=[...new Set(C.rows.map(r=>r.cat))].sort();
+  const cats=S.cats.map(c=>c.name);
   $("mvCat").innerHTML=`<button class="${MV.cat?"":"on"}" data-c="">Tutte</button>`+cats.map(c=>`<button class="${MV.cat===c?"on":""}" data-c="${esc(c)}">${esc(c)}</button>`).join("");
   $("mvCat").querySelectorAll("button").forEach(b=>b.onclick=()=>{ MV.cat=b.dataset.c; MV.limit=60; renderMv(); });
-  const conti=[...new Set(C.rows.map(r=>r.conto))].sort();
+  const conti=S.accounts.map(a=>a.name);
   $("mvConto").innerHTML=`<button class="${MV.conto?"":"on"}" data-c="">Tutti</button>`+conti.map(c=>`<button class="${MV.conto===c?"on":""}" data-c="${esc(c)}">${esc(lbl(c))}</button>`).join("");
   $("mvConto").querySelectorAll("button").forEach(b=>b.onclick=()=>{ MV.conto=b.dataset.c; MV.limit=60; renderMv(); });
-  const rows=mvRows(); const inTot=rows.filter(r=>r.imp>0).reduce((a,r)=>a+r.imp,0), outTot=-rows.filter(r=>r.imp<0).reduce((a,r)=>a+r.imp,0);
+  const rows=mvRows(), virt=mvVirtualRows(); const inTot=rows.filter(r=>r.imp>0).reduce((a,r)=>a+r.imp,0), outTot=-rows.filter(r=>r.imp<0).reduce((a,r)=>a+r.imp,0);
   const expBar=rows.length?`<div class="expbar"><button class="btn" id="mvCopy">⧉ Copia testo</button><button class="btn" id="mvShare">⇪ Esporta .txt</button></div>`:"";
   let h=expBar+`<div class="sum"><span><small>${rows.length} movimenti</small><b>${fmtIT(inTot-outTot)} €</b></span><span><small>Entrate</small><b>${fmt0(inTot)} €</b></span><span><small>Uscite</small><b>${fmt0(outTot)} €</b></span></div>`;
-  if(!rows.length) h+=`<div class="empty">${EMPTY_ART.list}Nessun movimento con questi filtri.</div>`;
-  else{ let day=null;
+  if(!rows.length&&!virt.length) h+=`<div class="empty">${EMPTY_ART.list}Nessun movimento con questi filtri.</div>`;
+  else if(rows.length){ let day=null;
     const shown=rows.slice(0,MV.limit);
     for(const r of shown){ if(r.d!==day){ if(day)h+=`</ul>`; day=r.d; h+=`<div class="day">${fromISO(r.d).toLocaleDateString("it-IT",{weekday:"short",day:"numeric",month:"long"})}</div><ul class="list">`; }
       const ci=(C.cats.find(c=>c.name===r.cat)||{}); const col=PALETTE[[...r.cat].reduce((a,ch)=>a+ch.charCodeAt(0),0)%PALETTE.length];
       h+=`<li data-id="${r.id||""}" class="mvrow"><span class="cico" style="background:${col}">${ci.emoji||"•"}</span><span class="txt"><b>${esc(r.desc)}</b><small>${esc(r.cat)} · ${esc(lbl(r.conto))}</small></span><span class="v ${r.imp>0?"in":""}">${fmtIT(r.imp)} €</span></li>`; }
     h+=`</ul>`;
     if(rows.length>MV.limit) h+=`<button class="more2" id="mvMore">Mostra altri ${Math.min(60,rows.length-MV.limit)} (di ${rows.length-MV.limit})</button>`;
+  }
+  if(virt.length){
+    h+=`<div class="day">Previste · ${monthLabel(MV.month)}<small style="opacity:.7"> non ancora confermate</small></div><ul class="list">`;
+    h+=virt.map(r=>{ const ci=(C.cats.find(c=>c.name===r.cat)||{}); const col=PALETTE[[...r.cat].reduce((a,ch)=>a+ch.charCodeAt(0),0)%PALETTE.length];
+      return `<li class="mvrow" style="opacity:.6"><span class="cico" style="background:${col}">${ci.emoji||"•"}</span><span class="txt"><b>${esc(r.desc)}</b><small>${esc(r.cat)} · ${esc(lbl(r.conto))} · previsto</small></span><span class="v ${r.imp>0?"in":""}">${fmtIT(r.imp)} €</span></li>`; }).join("");
+    h+=`</ul>`;
   }
   $("mvBody").innerHTML=h;
   const mm=$("mvMore"); if(mm) mm.onclick=()=>{ MV.limit+=60; renderMv(); };
@@ -3049,20 +3080,21 @@ function openPiani(){
   paintPiani(); openSheet("sheetPiani");
 }
 function paintPiani(){
-  const T=[["monthly","Mensile"],["weekly","Settimanale"],["interval","Ogni N giorni"]];
+  const T=[["monthly","Mensile"],["weekly","Settimanale"],["interval","Ogni N giorni"],["once","Una tantum (una volta sola)"]];
   $("pianiRows").innerHTML=PIANI_DRAFT.map((p,i)=>{
     const ft=pianoFineTipo(p);
-    const stato=p.attivo===false?"Interrotta":pianoScaduto(p)?"Conclusa":"Attiva";
+    const stato=p.type==="once"?"Una tantum":(p.attivo===false?"Interrotta":pianoScaduto(p)?"Conclusa":"Attiva");
     return `<div class="prow"><div class="rowbar"><b>${esc(p.desc||"Nuova")}</b><span style="font-size:12.5px;opacity:.7">${stato}${p.fine&&ft==="occorrenze"?` · ${p.fatte||0}/${p.fine.n}`:""}</span></div>
     <div class="in2"><div><label>Descrizione</label><input data-f="desc" data-i="${i}" value="${esc(p.desc||"")}"></div><div><label>Importo €</label><input data-f="imp" data-i="${i}" inputmode="decimal" value="${String(p.imp||0).replace(".",",")}"></div></div>
     <div class="in2"><div><label>Categoria</label><select data-f="cat" data-i="${i}">${CATS.map(c=>`<option ${c===p.cat?"selected":""}>${esc(c)}</option>`).join("")}</select></div><div><label>Conto</label><select data-f="conto" data-i="${i}">${CONTI.map(c=>`<option ${c===p.conto?"selected":""}>${esc(c)}</option>`).join("")}</select></div></div>
     <div class="in2"><div><label>Cadenza</label><select data-f="type" data-i="${i}">${T.map(([v,l])=>`<option value="${v}" ${v===p.type?"selected":""}>${l}</option>`).join("")}</select></div>
-    ${p.type==="weekly"?`<div><label>Giorno</label><select data-f="dow" data-i="${i}">${DOW.map((d,n)=>`<option value="${n}" ${n===(p.dow||0)?"selected":""}>${d}</option>`).join("")}</select></div>`:
+    ${p.type==="once"?`<div><label>Data</label><input type="date" data-f="data" data-i="${i}" value="${p.data||dateISO(today())}"></div>`:
+      p.type==="weekly"?`<div><label>Giorno</label><select data-f="dow" data-i="${i}">${DOW.map((d,n)=>`<option value="${n}" ${n===(p.dow||0)?"selected":""}>${d}</option>`).join("")}</select></div>`:
       p.type==="interval"?`<div><label>Ogni quanti giorni</label><input data-f="days" data-i="${i}" inputmode="numeric" value="${p.days||30}"></div>`:
       `<div><label>Giorno del mese</label><input data-f="from" data-i="${i}" inputmode="numeric" value="${p.from||1}"></div>`}</div>
-    <div class="in2"><div><label>Data inizio</label><input type="date" data-f="inizio" data-i="${i}" value="${p.inizio||dateISO(today())}"></div><div><label>Fine</label><select data-f="fineTipo" data-i="${i}"><option value="mai" ${ft==="mai"?"selected":""}>Nessuna</option><option value="occorrenze" ${ft==="occorrenze"?"selected":""}>Dopo N volte</option><option value="data" ${ft==="data"?"selected":""}>Entro una data</option></select></div></div>
+    ${p.type==="once"?"":`<div class="in2"><div><label>Data inizio</label><input type="date" data-f="inizio" data-i="${i}" value="${p.inizio||dateISO(today())}"></div><div><label>Fine</label><select data-f="fineTipo" data-i="${i}"><option value="mai" ${ft==="mai"?"selected":""}>Nessuna</option><option value="occorrenze" ${ft==="occorrenze"?"selected":""}>Dopo N volte</option><option value="data" ${ft==="data"?"selected":""}>Entro una data</option></select></div></div>
     ${ft==="occorrenze"?`<div class="in2"><div><label>Numero di volte</label><input data-f="fineN" data-i="${i}" inputmode="numeric" value="${(p.fine&&p.fine.n)||12}"></div><div></div></div>`:""}
-    ${ft==="data"?`<div class="in2"><div><label>Fino al</label><input type="date" data-f="fineData" data-i="${i}" value="${(p.fine&&p.fine.d)||dateISO(today())}"></div><div></div></div>`:""}
+    ${ft==="data"?`<div class="in2"><div><label>Fino al</label><input type="date" data-f="fineData" data-i="${i}" value="${(p.fine&&p.fine.d)||dateISO(today())}"></div><div></div></div>`:""}`}
     <div class="rowbar" style="margin-top:8px"><button class="btn" data-toggle="${i}">${p.attivo===false?"Riattiva":"Interrompi ora"}</button><button class="btn danger" data-del="${i}">Elimina</button></div>
     </div>`; }).join("");
   $("pianiRows").querySelectorAll("[data-f]").forEach(el=>el.onchange=el.oninput=()=>{
@@ -3071,6 +3103,7 @@ function paintPiani(){
     else if(f==="from") p.from=Math.max(1,Math.min(28,parseInt(el.value)||1));
     else if(f==="dow") p.dow=+el.value;
     else if(f==="days") p.days=Math.max(1,parseInt(el.value)||30);
+    else if(f==="data") p.data=el.value;
     else if(f==="fineTipo"){ p.fine=el.value==="mai"?null:{tipo:el.value,n:12,d:dateISO(today())}; paintPiani(); return; }
     else if(f==="fineN"){ p.fine=p.fine||{tipo:"occorrenze"}; p.fine.n=Math.max(1,parseInt(el.value)||1); }
     else if(f==="fineData"){ p.fine=p.fine||{tipo:"data"}; p.fine.d=el.value; }
@@ -3080,7 +3113,7 @@ function paintPiani(){
   $("pianiRows").querySelectorAll("[data-toggle]").forEach(b=>b.onclick=()=>{ const p=PIANI_DRAFT[+b.dataset.toggle]; p.attivo=p.attivo===false?true:false; paintPiani(); });
   $("pianiRows").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ if(!confirm("Eliminare questa spesa ricorrente?")) return; PIANI_DRAFT.splice(+b.dataset.del,1); paintPiani(); });
 }
-$("pianiAdd").onclick=()=>{ PIANI_DRAFT.push({id:newId(),desc:"",imp:0,cat:CATS[0]||"",conto:CONTI[0]||"",type:"monthly",from:1,dow:1,days:30,inizio:dateISO(today()),fine:null,attivo:true,fatte:0}); paintPiani(); const rows=$("pianiRows").querySelectorAll(".prow"); rows[rows.length-1].scrollIntoView({block:"center"}); };
+$("pianiAdd").onclick=()=>{ PIANI_DRAFT.push({id:newId(),desc:"",imp:0,cat:CATS[0]||"",conto:CONTI[0]||"",type:"monthly",from:1,dow:1,days:30,data:dateISO(today()),inizio:dateISO(today()),fine:null,attivo:true,fatte:0}); paintPiani(); const rows=$("pianiRows").querySelectorAll(".prow"); rows[rows.length-1].scrollIntoView({block:"center"}); };
 $("pianiSave").onclick=()=>{
   if(PIANI_DRAFT.some(p=>!p.desc.trim())) return toast("Ogni spesa ricorrente deve avere una descrizione",true);
   S.piani=PIANI_DRAFT.map(p=>({...p,desc:cleanTxt(p.desc)}));
