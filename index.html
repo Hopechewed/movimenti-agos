@@ -1298,6 +1298,10 @@ function pianoHint(p){
 function piano2rule(p){ return {id:"piano:"+p.id,planId:p.id,piano:true,type:p.type,from:p.from,dow:p.dow,days:p.days,data:p.data,desc:p.desc,cat:p.cat,conto:p.conto,imp:p.imp,hint:pianoHint(p)}; }
 // ---------- carte: date di addebito ----------
 function cardDue(c,ym){ const [y,m]=ym.split("-").map(Number); const d=new Date(y,m-1+(c.ritardo||1),c.giorno||15); d.setHours(12,0,0,0); return d; }
+// mese dell'estratto conto in cui finisce una spesa del giorno iso: dopo il giorno di chiusura scavalca al mese dopo
+function estrattoMese(c,iso){ const ch=c.chiusura||31, [y,m,g]=iso.split("-").map(Number); if(g<=ch) return iso.slice(0,7); return dateISO(new Date(y,m,1)).slice(0,7); }
+function estrattoLabel(c,ym){ const [y,m]=ym.split("-").map(Number), ch=c.chiusura||31, anno=y!==today().getFullYear()?" "+y:"";
+  return ch>=28?"spese di "+MESI[m-1].toLowerCase()+anno:`estratto al ${Math.min(ch,new Date(y,m,0).getDate())} ${MESI[m-1].toLowerCase()}${anno}`; }
 function prossimoGiorno(gg){ const t=today(); const d=new Date(t.getFullYear(),t.getMonth()+(t.getDate()<gg?0:1),gg); d.setHours(12,0,0,0); return dateISO(d); }
 function fissaPregresso(accounts){ accounts.forEach(a=>{ if(a.addebita&&Math.abs(a.saldo0||0)>0.004&&!a.pregressoData) a.pregressoData=prossimoGiorno(a.giorno||15); }); }
 // ---------- saldo previsionale: spese ricorrenti già previste ma non ancora confermate ----------
@@ -1674,9 +1678,9 @@ function calc(){
   // carte: la spesa conta una volta sola quando la fai; l'addebito sul conto è solo un regolamento
   const cardAccounts=[...C.accounts.filter(a=>a.addebita),...CARTE_EXTRA.filter(x=>!C.accounts.some(a=>a.name===x.name))];
   const cards=cardAccounts.map(c=>{ let settled=0; const pend=[]; const gg=c.giorno||GIORNO_ADDEBITO[c.name]||15, lag=c.ritardo||MESI_RITARDO[c.name]||1;
-    const byM={}; rows.filter(r=>r.conto===c.name).forEach(r=>{ const k=r.d.slice(0,7); byM[k]=(byM[k]||0)+r.imp; });
+    const byM={}; rows.filter(r=>r.conto===c.name).forEach(r=>{ const k=estrattoMese(c,r.d); byM[k]=(byM[k]||0)+r.imp; });
     Object.keys(byM).sort().forEach(k=>{ const [y,m]=k.split("-").map(Number), spend=byM[k]; const addebito=cardDue(c,k);
-      if(now>=addebito) settled+=spend; else if(Math.abs(spend)>0.004) pend.push({mese:MESI[m-1]+(y!==yearNow?" "+y:""),due:addebito,amount:spend}); });
+      if(now>=addebito) settled+=spend; else if(Math.abs(spend)>0.004) pend.push({mese:MESI[m-1]+(y!==yearNow?" "+y:""),lab:estrattoLabel(c,k),due:addebito,amount:spend}); });
     const preg=-(c.saldo0||0);
     if(Math.abs(preg)>0.004){ const due=fromISO(c.pregressoData||oggiISO); if(now>=due) settled+=preg; else pend.unshift({mese:"pregresso",pregresso:true,due,amount:preg}); }
     const total=sum(r=>r.conto===c.name)+preg; return {...c,giorno:gg,settled,pend,daAddebitare:total-settled}; });
@@ -2110,7 +2114,7 @@ function renderRp(){
   // saldi
   h+=`<div class="card"><h3>Saldo per conto</h3><ul class="rows">${D.saldi.map(a=>`<li><span>${esc(lbl(a.name))}</span><b>${fmtIT(a.saldo)} €</b></li>`).join("")}<li class="tot"><span>Totale liquidità</span><b>${fmtIT(D.liquidita)} €</b></li>${D.carte.map(c=>{
     const prev=pianiDelMese(R.month).filter(p=>p.conto===c.name).reduce((a,p)=>a+pianoResiduoMese(p,R.month),0)+righeFuture(R.month).filter(r=>r.conto===c.name).reduce((a,r)=>a+r.imp,0);
-    if(c.pend.length) return c.pend.map(p=>`<li><span>${esc(lbl(c.name))} · ${p.pregresso?"saldo pregresso":"spese di "+p.mese.toLowerCase()}<small>addebito su ${esc(lbl(c.addebita))} il ${dateIT(p.due)}</small></span><b>${fmtIT(p.amount)} €</b></li>`).join("")+(Math.abs(prev)>0.005?`<li><span>${esc(lbl(c.name))} · previsto ${monthLabel(R.month).toLowerCase()}<small>ricorrenti e futuri non ancora effettivi</small></span><b>${fmtIT(prev)} €</b></li>`:"");
+    if(c.pend.length) return c.pend.map(p=>`<li><span>${esc(lbl(c.name))} · ${p.pregresso?"saldo pregresso":p.lab}<small>addebito su ${esc(lbl(c.addebita))} il ${dateIT(p.due)}</small></span><b>${fmtIT(p.amount)} €</b></li>`).join("")+(Math.abs(prev)>0.005?`<li><span>${esc(lbl(c.name))} · previsto ${monthLabel(R.month).toLowerCase()}<small>ricorrenti e futuri non ancora effettivi</small></span><b>${fmtIT(prev)} €</b></li>`:"");
     if(Math.abs(prev)>0.005) return `<li><span>${esc(lbl(c.name))}<small>previsto per ${monthLabel(R.month).toLowerCase()}, non ancora confermato</small></span><b>${fmtIT(prev)} €</b></li>`;
     return `<li><span>${esc(lbl(c.name))}<small>nessuna spesa da addebitare</small></span><b>0,00 €</b></li>`;
   }).join("")}</ul></div>`;
@@ -2979,8 +2983,8 @@ function eventiFuturi(D,fine){
   const liquidi=new Set(D.saldi.map(a=>a.name));
   const ev=[];
   const add=(d,imp,desc,carta)=>{ if(d<oggi) d=oggi; if(d<=fine&&Math.abs(imp)>0.004) ev.push({d,imp,desc,carta}); };
-  const via=(conto,d,imp,desc)=>{ const c=carte[conto]; if(c) add(dateISO(cardDue(c,d.slice(0,7))),imp,desc,c.name); else if(liquidi.has(conto)) add(d,imp,desc); };
-  D.carte.forEach(c=>{ if(liquidi.has(c.addebita)) c.pend.forEach(p=>add(dateISO(p.due),p.amount,p.pregresso?"Pregresso "+lbl(c.name):"Spese "+p.mese.toLowerCase(),c.name)); });
+  const via=(conto,d,imp,desc)=>{ const c=carte[conto]; if(c) add(dateISO(cardDue(c,estrattoMese(c,d))),imp,desc,c.name); else if(liquidi.has(conto)) add(d,imp,desc); };
+  D.carte.forEach(c=>{ if(liquidi.has(c.addebita)) c.pend.forEach(p=>add(dateISO(p.due),p.amount,p.pregresso?"Pregresso "+lbl(c.name):p.lab.charAt(0).toUpperCase()+p.lab.slice(1),c.name)); });
   righeFuture().forEach(r=>via(r.conto,r.d,r.imp,r.desc));
   const mesi=[]; for(let k=0;dateISO(new Date(t.getFullYear(),t.getMonth()+k,1))<=fine;k++) mesi.push(dateISO(new Date(t.getFullYear(),t.getMonth()+k,1)).slice(0,7));
   S.piani.forEach(p=>{ if(p.attivo===false) return; const amt=pianoSignedAmt(p);
@@ -3310,10 +3314,12 @@ function paintConti(){
       <div class="in2"><div><label>Tipo</label><select data-f="tipo" data-i="${i}"><option value="conto" ${carta?"":"selected"}>Conto / contanti</option><option value="carta" ${carta?"selected":""}>Carta di credito</option></select></div>
       ${carta?`<div><label>Addebitata su</label><select data-f="addebita" data-i="${i}">${banks.map(b=>`<option ${b===a.addebita?"selected":""}>${esc(b)}</option>`).join("")}</select></div>`:"<div></div>"}</div>
       ${carta?`<div class="in2"><div><label>Giorno di addebito</label><input data-f="giorno" data-i="${i}" inputmode="numeric" value="${a.giorno||15}"></div><div><label>Addebito</label><select data-f="ritardo" data-i="${i}">${[1,2,3].map(n=>`<option value="${n}" ${n===(a.ritardo||1)?"selected":""}>${n===1?"il mese dopo":n+" mesi dopo"}</option>`).join("")}</select></div></div>
+      <div class="in2"><div><label>Chiusura estratto conto</label><input data-f="chiusura" data-i="${i}" inputmode="numeric" placeholder="fine mese" value="${a.chiusura||""}"></div><div style="font-size:12.5px;opacity:.7;align-self:end">Giorno del mese: le spese fatte dopo finiscono nell'estratto successivo</div></div>
       <div class="in2"><div><label>Pregresso addebitato il</label><input type="date" data-f="pregressoData" data-i="${i}" value="${a.pregressoData||prossimoGiorno(a.giorno||15)}"></div><div style="font-size:12.5px;opacity:.7;align-self:end">Spese fatte prima di usare l'app: non toccano la liquidità fino a questa data</div></div>`:""}
     </div>`; }).join("");
   $("contiRows").querySelectorAll("[data-f]").forEach(el=>el.onchange=el.oninput=()=>{ const a=CONTI_DRAFT[+el.dataset.i], f=el.dataset.f;
     if(f==="tipo"){ if(el.value==="carta"){ const b=banks.find(x=>x!==a.name); if(!b){ el.value="conto"; return toast("Serve prima un conto su cui addebitarla",true); } a.addebita=b; a.giorno=a.giorno||15; a.ritardo=a.ritardo||1; } else a.addebita=""; paintConti(); return; }
+    if(f==="chiusura"){ const v=parseInt(el.value); a.chiusura=v>=1&&v<=31?v:null; return; }
     if(f==="saldo0") a.saldo0=numIT2(el.value)||0; else if(f==="giorno") a.giorno=Math.max(1,Math.min(28,parseInt(el.value)||15)); else if(f==="ritardo") a.ritardo=+el.value; else a[f]=el.value; });
   $("contiRows").querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ const a=CONTI_DRAFT[+b.dataset.del]; const n=a._old?S.rows.filter(r=>r.conto===a._old).length:0;
     if(n) return toast(`Ci sono ${n} movimenti su ${a._old}: spostali o eliminali prima`,true);
