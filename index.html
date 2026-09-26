@@ -1017,7 +1017,8 @@
 <div class="sheet" id="sheetEdit">
   <div class="top"><h2>Modifica movimento</h2><button class="close" data-close="sheetEdit">Chiudi</button></div>
   <div class="prow">
-    <div class="in2"><div><label>Data</label><input type="date" id="ed_d"></div><div><label>Importo € (− per uscita)</label><input id="ed_i" inputmode="decimal"></div></div>
+    <div class="in2" style="grid-template-columns:1fr"><div><label>Tipo</label><div class="chips" id="ed_sign"><button type="button" data-s="-1">Uscita</button><button type="button" data-s="1">Entrata</button></div></div></div>
+    <div class="in2"><div><label>Data</label><input type="date" id="ed_d"></div><div><label>Importo €</label><input id="ed_i" inputmode="decimal"></div></div>
     <div class="in2" style="grid-template-columns:1fr"><div><label>Descrizione</label><input id="ed_desc"></div></div>
     <div class="in2"><div><label>Categoria</label><select id="ed_cat"></select></div><div><label>Conto</label><select id="ed_conto"></select></div></div>
   </div>
@@ -3305,11 +3306,15 @@ function importRows(){
 }
 function openEdit(id){
   const r=S.rows.find(x=>x.id===id); if(!r) return;
-  $("ed_d").value=r.d; $("ed_i").value=String(r.imp).replace(".",","); $("ed_desc").value=r.desc;
+  // il segno si sceglie con Uscita/Entrata: la tastiera decimale di iOS non ha il meno
+  let segno=r.imp>0?1:-1; const paintSign=()=>$("ed_sign").querySelectorAll("button").forEach(b=>b.classList.toggle("on",+b.dataset.s===segno));
+  $("ed_sign").onclick=e=>{ const b=e.target.closest("button"); if(!b) return; haptic(); segno=+b.dataset.s; paintSign(); };
+  $("ed_d").value=r.d; $("ed_i").value=String(Math.abs(r.imp)).replace(".",","); $("ed_desc").value=r.desc; paintSign();
   $("ed_cat").innerHTML=CATS.map(c=>`<option ${c===r.cat?"selected":""}>${esc(c)}</option>`).join("")+(CATS.includes(r.cat)?"":`<option selected>${esc(r.cat)}</option>`);
+  $("ed_cat").onchange=()=>{ segno=IN_CATS.has($("ed_cat").value)?1:-1; paintSign(); };
   $("ed_conto").innerHTML=CONTI.map(c=>`<option ${c===r.conto?"selected":""}>${esc(c)}</option>`).join("")+(CONTI.includes(r.conto)?"":`<option selected>${esc(r.conto)}</option>`);
   $("ed_save").onclick=()=>{ const v=numIT2($("ed_i").value); if(isNaN(v)||!$("ed_d").value||!$("ed_desc").value.trim()) return toast("Controlla data, descrizione e importo",true);
-    Object.assign(r,{d:$("ed_d").value,imp:Math.round(v*100)/100,desc:cleanTxt($("ed_desc").value),cat:$("ed_cat").value,conto:$("ed_conto").value});
+    Object.assign(r,{d:$("ed_d").value,imp:Math.round(Math.abs(v)*segno*100)/100,desc:cleanTxt($("ed_desc").value),cat:$("ed_cat").value,conto:$("ed_conto").value});
     save(); syncLocal(); openSheet("sheetMv"); renderMv(); toast("Movimento aggiornato"); };
   $("ed_del").onclick=()=>{ if(!confirm("Eliminare questo movimento?")) return; S.rows.splice(S.rows.indexOf(r),1); save(); syncLocal(); openSheet("sheetMv"); renderMv(); toast("Movimento eliminato"); };
   openSheet("sheetEdit");
