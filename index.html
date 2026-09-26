@@ -363,6 +363,12 @@
   .rp .rows{list-style:none;margin:0;padding:0}
   .rp .rows li{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:15px}
   .rp .rows li:last-child{border-bottom:0}
+  .rp .rows li.sec{border-bottom:0;padding:16px 0 4px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2);font-weight:700}
+  .rp .rows li.sec:first-child{padding-top:2px}
+  .rp .rows li.sec b{font-size:14px;letter-spacing:0;color:var(--ink)}
+  .rp .rows li.sec small{text-transform:none;letter-spacing:0;font-weight:500}
+  .rp .rows li.done{opacity:.55}
+  .rp .kpi div.prev{background:transparent;border:1.5px dashed var(--line)}
   .rp .rows li b{font-family:ui-rounded,-apple-system,system-ui,sans-serif;font-weight:600}
   .rp .rows li small{color:var(--ink-2);font-size:12.5px;display:block}
   .rp .rows li.tot{font-weight:700;border-top:2px solid var(--line)}
@@ -411,6 +417,43 @@
   .fire .hero .g2 b{font-size:15px;font-weight:700}
   .fire .card{background:var(--paper);border-radius:var(--r);padding:12px 14px;margin-bottom:10px}
   .fire .card h3{font-size:15px;margin:0 0 10px;font-weight:700}
+  .fire .card h3 small{font-weight:500;color:var(--ink-2);margin-left:6px;font-size:13px}
+  .fire .hero.autonomia{padding:18px 18px 16px}
+  .fire .hero .big .unit{font-size:20px;font-weight:600;margin-left:6px;color:#C5D6EC;letter-spacing:0}
+  .fire .hero.autonomia .big{font-size:52px}
+  .fire .runway{position:relative;height:12px;border-radius:7px;background:rgba(255,255,255,.14);margin:16px 0 6px}
+  .fire .runway i{position:absolute;left:0;top:0;bottom:0;border-radius:7px;background:linear-gradient(90deg,#4A90E8,#8BE0B5);animation:grow .9s cubic-bezier(.22,1,.36,1) both;transform-origin:left}
+  .fire .runway b{position:absolute;top:-5px;bottom:-5px;width:2px;margin-left:-1px;background:#fff;border-radius:1px;opacity:.85}
+  .fire .runway b::after{content:"riserva consigliata";position:absolute;top:-17px;left:50%;transform:translateX(-50%);font-size:10.5px;color:#C5D6EC;white-space:nowrap}
+  .fire .ticks{display:flex;justify-content:space-between;font-size:11px;color:#C5D6EC;font-variant-numeric:tabular-nums}
+  .fire .pill{display:inline-flex;gap:7px;align-items:center;margin-top:14px;padding:6px 11px;border-radius:999px;font-size:12.5px;font-weight:700;background:rgba(255,255,255,.12)}
+  .fire .pill span{display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.14)}
+  .fire .pill.ok{color:#8BE0B5} .fire .pill.warn{color:#F6C87A} .fire .pill.crit{color:#F6A28C}
+  .fire .scen{display:grid;gap:16px}
+  .fire .scen .row{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:end}
+  .fire .scen .row span{font-size:14.5px;font-weight:600}
+  .fire .scen .row span small{display:block;font-weight:500;color:var(--ink-2);font-size:12.5px;margin-top:1px}
+  .fire .scen .row b{font-size:18px;font-family:ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .fire .scen .track{grid-column:1/-1;height:8px;border-radius:5px;background:var(--key);overflow:hidden}
+  .fire .scen .track i{display:block;height:100%;border-radius:5px;background:var(--go);animation:grow .8s cubic-bezier(.22,1,.36,1) both;transform-origin:left}
+  .fire .scen .row:first-child .track i{background:linear-gradient(90deg,var(--go),#8BE0B5)}
+  .fire .scen .row.na{opacity:.45}
+  .fire .fisse{display:grid;gap:4px}
+  .fire .fx{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+  .fire .fx:last-child{border-bottom:0}
+  .fire .fxh{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .fire .fxh span{font-size:15px;font-weight:600;min-width:0}
+  .fire .fxh span small{display:block;font-size:12px;font-weight:500;color:var(--ink-2);margin-top:1px}
+  .fire .fxh b{font-size:16px;white-space:nowrap;font-family:ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+  .fire .fxh b small{font-size:11.5px;font-weight:500;color:var(--ink-2)}
+  .fire .fxb{height:5px;border-radius:3px;background:var(--key);overflow:hidden}
+  .fire .fxb i{display:block;height:100%;border-radius:3px;background:var(--go)}
+  .fire .fx .tg{font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:var(--go-soft);color:var(--go);min-height:0}
+  .fire .fx.off .tg{background:var(--key);color:var(--ink-2)}
+  .fire .fx.off .fxb i{background:var(--ink-2);opacity:.45}
+  .fire .fx.off .fxh span,.fire .fx.off .fxh b{opacity:.6}
+  @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @media (prefers-reduced-motion:reduce){.fire .runway i,.fire .scen .track i{animation:none}}
   .fire .ip{margin-bottom:12px}
   .fire .ip .r1{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
   .fire .ip label{font-size:13.5px;color:var(--ink-2)}
@@ -910,6 +953,7 @@
 <div class="sheet fire" id="sheetFire">
   
   <div class="modes" id="fireModes">
+    <button data-m="auto">Autonomia</button>
     <button data-m="proj" class="on">Proiezione</button>
     <button data-m="pmt">Quanto investire</button>
     <button data-m="rate">Che rendimento</button>
@@ -1189,8 +1233,9 @@ function newId(){ return Date.now().toString(36)+Math.random().toString(36).slic
 // ---------- helpers ----------
 const $=id=>document.getElementById(id);
 function toast(msg,warn){ const t=$("toast"); t.textContent=msg; t.className="toast show"+(warn?" warn":""); clearTimeout(t._t); t._t=setTimeout(()=>t.className="toast",2600); }
-function fmtIT(n){ return n.toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function fmt0(n){ return n.toLocaleString("it-IT",{minimumFractionDigits:0,maximumFractionDigits:0}); }
+// useGrouping "always": in it-IT le cifre sotto 10.000 non verrebbero raggruppate (1300 vs 16.184)
+function fmtIT(n){ return n.toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:"always"}); }
+function fmt0(n){ return (Math.round(n)||0).toLocaleString("it-IT",{maximumFractionDigits:0,useGrouping:"always"}); }
 function amtNum(){ return F.amt? parseFloat(F.amt.replace(",","."))||0 : 0; }
 function pad2(n){ return String(n).padStart(2,"0"); }
 function today(){ const d=new Date(); d.setHours(12,0,0,0); return d; }
@@ -2027,18 +2072,27 @@ function renderRp(){
   const CF=isCur?cashflow(90):null; if(CF) h+=lowestHTML(CF,false);
   // mese
   const previstoMese=previstoResiduoMese(R.month), speseAttese=Math.max(0,-previstoMese);
+  const addCarte=addebitiCarteMese(R.month), totCarte=addCarte.reduce((a,x)=>a+x.imp,0);
+  const sgn=v=>`${v>=0?"+":"−"}${fmtIT(Math.abs(v))} €`, giornoMese=d=>fromISO(d).toLocaleDateString("it-IT",{day:"numeric",month:"short"});
   h+=`<div class="card"><div class="mnav"><button id="mPrev">‹</button><b>${monthLabel(R.month)}</b><button id="mNext">›</button></div>
-    <div class="kpi"><div><small>Entrate</small><b><span class="cnt" data-v="${M.entrate}">${fmt0(M.entrate)}</span> €</b></div><div><small>Spese effettive</small><b><span class="cnt" data-v="${M.spese}">${fmt0(M.spese)}</span> €</b></div><div><small>Investiti</small><b><span class="cnt" data-v="${M.investiti}">${fmt0(M.investiti)}</span> €</b></div><div><small>Risparmio · ${Math.round(M.tasso*100)}%</small><b><span class="cnt" data-v="${M.risparmio}">${fmt0(M.risparmio)}</span> €</b></div>${speseAttese>0.005?`<div><small>Spese previste</small><b><span class="cnt" data-v="${speseAttese}">${fmt0(speseAttese)}</span> €</b></div>`:""}</div></div>`;
-  // spese previste in questo mese: ricorrenti + una tantum (qualunque mese si stia sfogliando)
+    <div class="kpi"><div><small>Entrate</small><b><span class="cnt" data-v="${M.entrate}">${fmt0(M.entrate)}</span> €</b></div><div><small>Spese effettive</small><b><span class="cnt" data-v="${M.spese}">${fmt0(M.spese)}</span> €</b></div><div><small>Investiti</small><b><span class="cnt" data-v="${M.investiti}">${fmt0(M.investiti)}</span> €</b></div><div><small>Risparmio · ${Math.round(M.tasso*100)}%</small><b><span class="cnt" data-v="${M.risparmio}">${fmt0(M.risparmio)}</span> €</b></div>${speseAttese>0.005||totCarte<-0.005?`<div class="prev"><small>Spese previste</small><b><span class="cnt" data-v="${speseAttese}">${fmt0(speseAttese)}</span> €</b></div><div class="prev"><small>Addebiti carte</small><b><span class="cnt" data-v="${-totCarte}">${fmt0(-totCarte)}</span> €</b></div>`:""}</div></div>`;
+  // cosa succederà in questo mese: spese previste (ricorrenti, una tantum, futuri) e, a parte, gli addebiti carte
   { const pMese=pianiDelMese(R.month), fut=righeFuture(R.month);
-    if(pMese.length||fut.length){
-      const tot=previstoMese;
-      h+=`<div class="card"><h3>Spese previste<small>${monthLabel(R.month)}</small></h3><ul class="rows">${fut.map(r=>`<li><span>${esc(r.desc)}<small>futuro · ${dateIT(fromISO(r.d))}</small></span><b class="${r.imp>0?"in":""}">${r.imp>=0?"+":"−"}${fmtIT(Math.abs(r.imp))} €</b></li>`).join("")}${pMese.map(p=>{
-        const n=occorrenzeMese(p,R.month), fatto=confermatoNelMeseImp(p,R.month), resid=pianoResiduoMese(p,R.month);
-        if(Math.abs(resid)<0.005) return `<li><span>${esc(p.desc)}<small>confermata ✓</small></span><b></b></li>`;
-        const stato=Math.abs(fatto)>0.005?"parzialmente confermata":"";
-        return `<li><span>${esc(p.desc)}${n>1?` <small>×${n}</small>`:""}${stato?` <small>${stato}</small>`:""}</span><b class="${resid>0.005?"in":""}">${resid>=0?"+":"−"}${fmtIT(Math.abs(resid))} €</b></li>`;
-      }).join("")}<li class="tot"><span>Ancora da confermare</span><b class="${tot>0.005?"in":""}">${tot>=0?"+":"−"}${fmtIT(Math.abs(tot))} €</b></li></ul></div>`;
+    if(pMese.length||fut.length||addCarte.length){
+      const quando=p=>p.type==="once"?giornoMese(p.data):p.type==="monthly"?`il ${Math.min(p.from||1,31)}`:p.type==="weekly"?`ogni ${DOW[p.dow||0].toLowerCase()}`:`ogni ${p.days} giorni`;
+      h+=`<div class="card"><h3>In arrivo<small>${monthLabel(R.month)}</small></h3><ul class="rows">`;
+      if(pMese.length||fut.length){
+        h+=`<li class="sec"><span>Spese previste</span><b>${sgn(previstoMese)}</b></li>`;
+        h+=fut.map(r=>`<li><span>${esc(r.desc)}<small>movimento futuro · ${giornoMese(r.d)}</small></span><b class="${r.imp>0?"in":""}">${sgn(r.imp)}</b></li>`).join("");
+        h+=pMese.map(p=>{ const n=occorrenzeMese(p,R.month), fatto=confermatoNelMeseImp(p,R.month), resid=pianoResiduoMese(p,R.month);
+          if(Math.abs(resid)<0.005) return `<li class="done"><span>${esc(p.desc)}<small>confermata ✓</small></span><b>${sgn(fatto)}</b></li>`;
+          return `<li><span>${esc(p.desc)}${n>1?` ×${n}`:""}<small>${Math.abs(fatto)>0.005?"parzialmente confermata · ":""}${quando(p)} · ${esc(lbl(p.conto))}</small></span><b class="${resid>0.005?"in":""}">${sgn(resid)}</b></li>`; }).join("");
+      }
+      if(addCarte.length){
+        h+=`<li class="sec"><span>Addebiti carte sul conto<small>regolamenti di spese già contate, non nuove spese</small></span><b>${sgn(totCarte)}</b></li>`;
+        h+=addCarte.map(a=>`<li><span>${esc(lbl(a.carta))} · ${giornoMese(a.d)}<small>${[...new Set(a.voci.map(v=>v.desc))].slice(0,4).map(esc).join(", ")}${a.voci.length>4?"…":""}</small></span><b>${sgn(a.imp)}</b></li>`).join("");
+      }
+      h+=`</ul></div>`;
     }
   }
   // entrate del mese
@@ -2860,26 +2914,45 @@ function renderBud(){
 const CAT_NON_OBBL=["Abbonamenti","Sport","Svago","Ristorante","Viaggi","Regali","Abbigliamento","Cura della persona"];
 function pianoObbl(p){ return typeof p.obbl==="boolean"?p.obbl:!CAT_NON_OBBL.includes(p.cat); }
 function pianoMensile(p){ if(p.type==="once") return 0; const a=Math.abs(p.imp||0); return p.type==="weekly"?a*52/12:p.type==="interval"?a*365.25/12/(p.days||30):a; }
-function speseRicorrentiMensili(soloObbl){ const ym=dateISO(today()).slice(0,7);
-  return S.piani.filter(p=>p.attivo!==false&&pianoSignedAmt(p)<0&&(pianoAttivoNelMese(p,ym)||(p.inizio&&p.inizio>dateISO(today())))&&(!soloObbl||pianoObbl(p))).reduce((a,p)=>a+pianoMensile(p),0); }
-function autonomiaHTML(D){
-  const liq=D.liquidita+Math.min(0,D.carteTot);
+function speseRicorrentiMensili(soloObbl){ return pianiFissi().filter(p=>!soloObbl||pianoObbl(p)).reduce((a,p)=>a+pianoMensile(p),0); }
+function pianiFissi(){ const ym=dateISO(today()).slice(0,7), o=dateISO(today());
+  return S.piani.filter(p=>p.attivo!==false&&p.type!=="once"&&pianoSignedAmt(p)<0&&(pianoAttivoNelMese(p,ym)||(p.inizio&&p.inizio>o))); }
+function autonomiaPage(D){
+  const t=today(), liq=D.liquidita+Math.min(0,D.carteTot);
   // il primo mese di utilizzo è quasi sempre parziale: non fa media
-  const cur=dateISO(today()).slice(0,7), chiusi=D.months.filter(m=>m<cur&&m>D.months[0]).slice(-6);
+  const cur=dateISO(t).slice(0,7), chiusi=D.months.filter(m=>m<cur&&m>D.months[0]).slice(-6);
   const media=chiusi.length?chiusi.reduce((a,m)=>a+D.month(m).spese,0)/chiusi.length:null;
   const fisse=speseRicorrentiMensili(true), tutte=speseRicorrentiMensili(false);
-  const mesi=v=>v>0.5?(liq/v).toFixed(1).replace(".",",")+" mesi":"—";
-  if(fisse<0.5&&tutte<0.5&&media==null) return `<div class="card"><h3>Autonomia finanziaria</h3><p class="note">Aggiungi le spese ricorrenti (mutuo, utenze, finanziamenti) per sapere quanti mesi reggeresti senza entrate.</p></div>`;
-  return `<div class="card"><h3>Autonomia finanziaria<small>se le entrate si fermassero oggi</small></h3>
-    <div style="font-size:30px;font-weight:700">${mesi(fisse)}</div>
-    <p style="margin:2px 0 10px;color:var(--ink-2);font-size:14px">Liquidità ${fmt0(liq)} € (già al netto delle carte) · spese fisse obbligatorie ${fmt0(fisse)} €/mese</p>
-    <ul class="rows">
-      <li><span>Solo spese fisse obbligatorie<small>${fmt0(fisse)} €/mese</small></span><b>${mesi(fisse)}</b></li>
-      <li><span>Tutte le ricorrenti<small>${fmt0(tutte)} €/mese, abbonamenti inclusi</small></span><b>${mesi(tutte)}</b></li>
-      <li><span>Spesa media reale<small>${media==null?"serve almeno un mese intero di movimenti":fmt0(media)+" €/mese, ultimi "+chiusi.length+" mesi"}</small></span><b>${media==null?"—":mesi(media)}</b></li>
-    </ul>
-    <p class="note" style="margin-top:8px">Basato sulle sole spese conosciute. Quali ricorrenti sono obbligatorie lo scegli in ⚙︎ → Spese ricorrenti.</p></div>`;
+  const nm=v=>v>0.5?liq/v:null, m1=nm(fisse), fmtM=v=>v==null?"—":(v>=100?"99+":v.toFixed(1).replace(".",","));
+  if(m1==null) return `<div class="hero"><div class="lbl">Autonomia finanziaria</div><div class="big">—</div><div class="sub">Aggiungi mutuo, affitto, utenze e finanziamenti tra le spese ricorrenti (⚙︎ → Spese ricorrenti) e segnale come obbligatorie: qui vedrai quanti mesi reggeresti senza entrate.</div></div>`;
+  const fine=new Date(t); fine.setDate(fine.getDate()+Math.round(Math.min(m1,1200)*30.44));
+  const st=m1>=6?{c:"ok",i:"✓",t:"Solido · oltre la riserva consigliata"}:m1>=3?{c:"warn",i:"!",t:"Discreto · tra 3 e 6 mesi"}:{c:"crit",i:"⚠",t:"Fragile · meno di 3 mesi"};
+  const scala=m1>36?36:Math.max(12,Math.ceil(m1/6)*6), passo=scala>24?12:6, pct=v=>Math.min(100,v/scala*100);
+  let tick=""; for(let k=0;k<=scala;k+=passo) tick+=`<span>${k}${k===scala&&m1>36?"+":""}</span>`;
+  let h=`<div class="hero autonomia">
+    <div class="lbl">Se le entrate si fermassero oggi</div>
+    <div class="big">${fmtM(m1)}<span class="unit">mesi</span></div>
+    <div class="sub">Con le sole spese fisse obbligatorie arrivi a <em>${MESI[fine.getMonth()].toLowerCase()} ${fine.getFullYear()}</em></div>
+    <div class="runway" role="img" aria-label="${fmtM(m1)} mesi su una scala di ${scala}"><i style="width:${pct(m1)}%"></i>${6<=scala?`<b style="left:${pct(6)}%"></b>`:""}</div>
+    <div class="ticks">${tick}</div>
+    <div class="pill ${st.c}"><span>${st.i}</span>${st.t}</div>
+    <div class="g2"><div><small>Liquidità netta</small><b>${fmt0(liq)} €</b></div><div><small>Spese fisse obbligatorie</small><b>${fmt0(fisse)} €/mese</b></div></div>
+  </div>`;
+  const sc=[{n:"Solo spese fisse obbligatorie",s:`${fmt0(fisse)} €/mese`,v:m1},
+    {n:"Tutte le ricorrenti",s:`${fmt0(tutte)} €/mese, abbonamenti inclusi`,v:nm(tutte)},
+    {n:"Spesa media reale",s:media==null?"serve almeno un mese intero di movimenti":`${fmt0(media)} €/mese, ultimi ${chiusi.length} mesi`,v:media==null?null:nm(media)}];
+  const maxV=Math.max(...sc.map(x=>x.v||0));
+  h+=`<div class="card"><h3>Tre scenari</h3><div class="scen">${sc.map(x=>`<div class="row${x.v==null?" na":""}"><span>${x.n}<small>${x.s}</small></span><b>${fmtM(x.v)}${x.v==null?"":" mesi"}</b><div class="track"><i style="width:${x.v==null?0:Math.max(3,x.v/maxV*100)}%"></i></div></div>`).join("")}</div></div>`;
+  const pf=pianiFissi().sort((a,b)=>pianoMensile(b)-pianoMensile(a)), maxP=Math.max(...pf.map(pianoMensile),1);
+  const quando=p=>p.type==="monthly"?`il ${p.from||1} del mese`:p.type==="weekly"?`ogni ${DOW[p.dow||0].toLowerCase()}`:`ogni ${p.days} giorni`;
+  h+=`<div class="card"><h3>Le tue spese fisse<small>tocca per cambiare</small></h3><div class="fisse">${pf.map(p=>{ const o=pianoObbl(p);
+    return `<div class="fx${o?"":" off"}"><div class="fxh"><span>${esc(p.desc)}<small>${esc(p.cat)} · ${quando(p)}${p.inizio&&p.inizio>dateISO(t)?" · dal "+dateIT(fromISO(p.inizio)):""}</small></span><b>${fmt0(pianoMensile(p))} €<small>/mese</small></b></div>
+      <div class="fxb"><i style="width:${pianoMensile(p)/maxP*100}%"></i></div>
+      <button class="tg" data-obbl="${esc(p.id)}">${o?"Obbligatoria":"Rinunciabile"}</button></div>`; }).join("")}</div></div>`;
+  h+=`<div class="card"><p class="note">Liquidità netta = conti meno carte già da addebitare. Il calcolo usa solo le spese che conosci: tasse, imprevisti e spese annuali non sono inclusi. La riserva consigliata di solito va da 3 a 6 mesi di spese essenziali.</p></div>`;
+  return h;
 }
+function bindAutonomia(){ document.querySelectorAll("#fireBody [data-obbl]").forEach(b=>b.onclick=()=>{ const p=S.piani.find(x=>x.id===b.dataset.obbl); if(!p) return; haptic(); p.obbl=!pianoObbl(p); save(); renderFire(); }); }
 // ================= VERSATO VS MERCATO =================
 // Serve il valore degli asset a inizio di ogni mese: lo snapshot parte da ora (vedi syncLocal).
 function versatoMercatoHTML(){
@@ -2899,17 +2972,17 @@ function versatoMercatoHTML(){
 // ================= CASH-FLOW FUTURO =================
 // Proiezione giorno per giorno della liquidità: movimenti futuri, ricorrenze non ancora confermate,
 // addebiti carte (pregresso incluso). Le spese su carta pesano sul conto il giorno dell'addebito.
-function cashflow(giorni){
-  const D=calc(); if(!D) return null;
-  const t=today(), oggi=dateISO(t), dOff=k=>dateISO(new Date(t.getFullYear(),t.getMonth(),t.getDate()+k)), fine=dOff(giorni);
+// Eventi futuri che muovono la liquidità, fino a `fine` (ISO). Quelli passati da una carta portano `carta`.
+function eventiFuturi(D,fine){
+  const t=today(), oggi=dateISO(t);
   const carte={}; S.accounts.filter(a=>a.addebita).forEach(a=>carte[a.name]=a);
   const liquidi=new Set(D.saldi.map(a=>a.name));
   const ev=[];
-  const add=(d,imp,desc)=>{ if(d<oggi) d=oggi; if(d<=fine&&Math.abs(imp)>0.004) ev.push({d,imp,desc}); };
-  const via=(conto,d,imp,desc)=>{ const c=carte[conto]; if(c) add(dateISO(cardDue(c,d.slice(0,7))),imp,desc); else if(liquidi.has(conto)) add(d,imp,desc); };
-  D.carte.forEach(c=>{ if(liquidi.has(c.addebita)) c.pend.forEach(p=>add(dateISO(p.due),p.amount,"Addebito "+lbl(c.name))); });
+  const add=(d,imp,desc,carta)=>{ if(d<oggi) d=oggi; if(d<=fine&&Math.abs(imp)>0.004) ev.push({d,imp,desc,carta}); };
+  const via=(conto,d,imp,desc)=>{ const c=carte[conto]; if(c) add(dateISO(cardDue(c,d.slice(0,7))),imp,desc,c.name); else if(liquidi.has(conto)) add(d,imp,desc); };
+  D.carte.forEach(c=>{ if(liquidi.has(c.addebita)) c.pend.forEach(p=>add(dateISO(p.due),p.amount,p.pregresso?"Pregresso "+lbl(c.name):"Spese "+p.mese.toLowerCase(),c.name)); });
   righeFuture().forEach(r=>via(r.conto,r.d,r.imp,r.desc));
-  const mesi=[]; for(let k=0;k<=Math.ceil(giorni/28)+1;k++) mesi.push(dateISO(new Date(t.getFullYear(),t.getMonth()+k,1)).slice(0,7));
+  const mesi=[]; for(let k=0;dateISO(new Date(t.getFullYear(),t.getMonth()+k,1))<=fine;k++) mesi.push(dateISO(new Date(t.getFullYear(),t.getMonth()+k,1)).slice(0,7));
   S.piani.forEach(p=>{ if(p.attivo===false) return; const amt=pianoSignedAmt(p);
     let resto=p.fine&&p.fine.tipo==="occorrenze"?Math.max(0,p.fine.n-(p.fatte||0)):Infinity;
     if(p.type==="interval"){ const own=S.rows.filter(r=>r.planId===p.id).map(r=>r.d).sort(); let d=fromISO(own.length?own[own.length-1]:(p.inizio||oggi));
@@ -2922,7 +2995,20 @@ function cashflow(giorni){
       else if(p.type==="weekly"){ for(let d=1;d<=dim;d++) if(new Date(y,m-1,d).getDay()===(p.dow||0)) date.push(`${ym}-${pad2(d)}`); }
       else date=[`${ym}-${pad2(Math.min(p.from||1,dim))}`];
       const manca=Math.max(0,date.length-confermateNelMese(p,ym)); date.slice(date.length-manca).forEach(s=>{ if(resto>0){ via(p.conto,s,amt,p.desc); resto--; } }); }); });
-  ev.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+  return ev.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
+}
+// addebiti delle carte che cadranno nel mese ym, raggruppati per carta e data
+function addebitiCarteMese(ym){
+  const D=calc(); if(!D) return [];
+  const [y,m]=ym.split("-").map(Number), fine=dateISO(new Date(y,m,0));
+  if(fine<dateISO(today())) return [];
+  const g={}; eventiFuturi(D,fine).filter(e=>e.carta&&e.d.slice(0,7)===ym).forEach(e=>{ const k=e.carta+"|"+e.d; (g[k]=g[k]||{carta:e.carta,d:e.d,imp:0,voci:[]}); g[k].imp+=e.imp; g[k].voci.push(e); });
+  return Object.values(g).sort((a,b)=>a.d<b.d?-1:1);
+}
+function cashflow(giorni){
+  const D=calc(); if(!D) return null;
+  const t=today(), dOff=k=>dateISO(new Date(t.getFullYear(),t.getMonth(),t.getDate()+k));
+  const ev=eventiFuturi(D,dOff(giorni)).map(e=>e.carta?{...e,desc:"Addebito "+lbl(e.carta)}:e);
   let v=D.liquidita, i=0; const pts=[];
   for(let k=0;k<=giorni;k++){ const d=dOff(k); while(i<ev.length&&ev[i].d<=d){ v+=ev[i].imp; i++; } pts.push({d,v}); }
   let min=pts[0]; pts.forEach(p=>{ if(p.v<min.v) min=p; });
@@ -3022,7 +3108,7 @@ function fireChart(P,pmt,rReal,anni,target){
 function ipNum(id,label,val,unit,hint){ return `<div class="ip"><div class="r1"><label for="${id}">${label}</label><span class="v"><input type="text" id="${id}" inputmode="decimal" value="${val}"><span class="u">${unit}</span></span></div>${hint?`<div class="hint">${hint}</div>`:""}</div>`; }
 function ipRange(id,label,val,unit,min,max,step,hint){ return `<div class="ip"><div class="r1"><label for="${id}">${label}</label><span class="v"><input type="text" id="${id}" inputmode="decimal" value="${String(val).replace(".",",")}"><span class="u">${unit}</span></span></div><input type="range" id="${id}_r" min="${min}" max="${max}" step="${step}" value="${val}">${hint?`<div class="hint">${hint}</div>`:""}</div>`; }
 function fireLive(){
-  const f=fireCfg(), D=calc(); if(!D) return;
+  const f=fireCfg(), D=calc(); if(!D||f.mode==="auto") return;
   const rr=realRate(f.rate,f.infl), target=f.spesa*12/(f.swr/100), yFire=yearsTo(f.cap,f.pac,rr,target);
   let hero="";
   if(f.mode==="proj"){ const finale=fv(f.cap,f.pac,rr,f.anni), nom=fv(f.cap,f.pac,f.rate,f.anni), rendita=finale*(f.swr/100)/12;
@@ -3050,30 +3136,31 @@ function renderFire(){
   const target=f.spesa*12/(f.swr/100);
   const yFire=yearsTo(f.cap,f.pac,rr,target);
   $("fireModes").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===f.mode));
+  if(f.mode==="auto"){ body.innerHTML=autonomiaPage(D); animateCounts(body); bindAutonomia(); return; }
   let hero="",extra="";
   if(f.mode==="proj"){
     const finale=fv(f.cap,f.pac,rr,f.anni), nom=fv(f.cap,f.pac,f.rate,f.anni);
     const rendita=finale*(f.swr/100)/12;
     hero=`<div class="hero"><div class="lbl">Capitale fra ${f.anni} anni · potere d'acquisto di oggi</div><div class="big">${fmtIT(finale)} €</div>
       <div class="sub">Rendita al ${String(f.swr).replace(".",",")}%: <em>${fmt0(rendita)} €/mese</em></div>
-      <div class="g2"><div><small>Obiettivo FIRE</small><b>${fmt0(target)} €</b></div><div><small>${yFire!=null?"Traguardo tra":"Traguardo"}</small><b>${yFire!=null?yFire.toFixed(1)+" anni":"oltre 100 anni"}</b></div>
+      <div class="g2"><div><small>Obiettivo FIRE</small><b>${fmt0(target)} €</b></div><div><small>${yFire!=null?"Traguardo tra":"Traguardo"}</small><b>${yFire!=null?yFire.toFixed(1).replace(".",",")+" anni":"oltre 100 anni"}</b></div>
       <div><small>Versato in ${f.anni} anni</small><b>${fmt0(f.pac*12*f.anni)} €</b></div><div><small>Valore nominale</small><b>${fmt0(nom)} €</b></div></div></div>`;
     extra=ipRange("f_anni","Orizzonte",f.anni,"anni",1,45,1);
   } else if(f.mode==="pmt"){
     const need=pmtFor(f.cap,rr,f.anni,target); const delta=need-f.pac;
     hero=`<div class="hero"><div class="lbl">Per arrivare a ${fmt0(target)} € in ${f.anni} anni</div><div class="big">${fmtIT(need)} €/mese</div>
       <div class="sub">${Math.abs(delta)<1?"Sei esattamente in linea":(delta>0?`<em style="color:#F6A28C">${fmt0(delta)} € in più</em> di quanto investi oggi`:`<em>${fmt0(-delta)} € in meno</em> di quanto investi oggi`)}</div>
-      <div class="g2"><div><small>PAC attuale</small><b>${fmt0(f.pac)} €/mese</b></div><div><small>Rendimento reale</small><b>${rr.toFixed(1)}%</b></div></div></div>`;
+      <div class="g2"><div><small>PAC attuale</small><b>${fmt0(f.pac)} €/mese</b></div><div><small>Rendimento reale</small><b>${rr.toFixed(1).replace(".",",")}%</b></div></div></div>`;
     extra=ipRange("f_anni","In quanti anni",f.anni,"anni",1,45,1);
   } else {
     const need=rateFor(f.cap,f.pac,f.anni,target);
-    hero=`<div class="hero"><div class="lbl">Rendimento reale necessario in ${f.anni} anni</div><div class="big">${need==null?"non raggiungibile":need.toFixed(1)+"%"}</div>
-      <div class="sub">${need==null?"Con questo PAC il traguardo non si raggiunge: aumenta versamento o anni":`Nominale con inflazione al ${String(f.infl).replace(".",",")}%: <em>${(((1+need/100)*(1+f.infl/100)-1)*100).toFixed(1)}%</em>`}</div>
+    hero=`<div class="hero"><div class="lbl">Rendimento reale necessario in ${f.anni} anni</div><div class="big">${need==null?"non raggiungibile":need.toFixed(1).replace(".",",")+"%"}</div>
+      <div class="sub">${need==null?"Con questo PAC il traguardo non si raggiunge: aumenta versamento o anni":`Nominale con inflazione al ${String(f.infl).replace(".",",")}%: <em>${(((1+need/100)*(1+f.infl/100)-1)*100).toFixed(1).replace(".",",")}%</em>`}</div>
       <div class="g2"><div><small>Obiettivo</small><b>${fmt0(target)} €</b></div><div><small>PAC</small><b>${fmt0(f.pac)} €/mese</b></div></div></div>`;
     extra=ipRange("f_anni","In quanti anni",f.anni,"anni",1,45,1);
   }
   hero=hero.replace(/<\/div>$/,`<div class="forwho"><img class="famav sm" src="${FAM_SRC}" alt="" onerror="this.remove()">La tua libertà finanziaria</div></div>`);
-  body.innerHTML=hero+autonomiaHTML(D)+
+  body.innerHTML=hero+
   `<div class="card"><h3>Punto di partenza</h3>
     <div class="seg2" id="f_base"><button data-b="asset" class="${f.base==="asset"?"on":""}">Solo investito</button><button data-b="tot" class="${f.base==="tot"?"on":""}">Patrimonio totale</button></div>
     ${ipNum("f_cap","Capitale iniziale",fmt0(f.cap),"€","Dal file: investito ${a} € · totale ${b} €".replace("${a}",fmt0(D.assetTot)).replace("${b}",fmt0(D.patrimonio)))}
@@ -3081,7 +3168,7 @@ function renderFire(){
     ${extra}</div>
   <div class="card"><h3>Ipotesi di mercato</h3>
     ${ipRange("f_rate","Rendimento annuo",f.rate,"%",0,15,0.5)}
-    ${ipRange("f_infl","Inflazione",f.infl,"%",0,8,0.25,`Rendimento reale: <b>${rr.toFixed(1)}%</b>`)}
+    ${ipRange("f_infl","Inflazione",f.infl,"%",0,8,0.25,`Rendimento reale: <b>${rr.toFixed(1).replace(".",",")}%</b>`)}
   </div>
   <div class="card"><h3>Obiettivo di vita</h3>
     ${ipNum("f_spesa","Spesa mensile",fmt0(f.spesa),"€","Le tue spese medie degli ultimi 6 mesi")}
@@ -3092,7 +3179,7 @@ function renderFire(){
       <li><span>Fra 5 anni</span><b>${fmt0(fv(f.cap,f.pac,rr,5))} €</b></li>
       <li><span>Fra 10 anni</span><b>${fmt0(fv(f.cap,f.pac,rr,10))} €</b></li>
       <li><span>Fra 20 anni</span><b>${fmt0(fv(f.cap,f.pac,rr,20))} €</b></li>
-      <li><span>Al traguardo FIRE<small>${yFire!=null?"tra "+yFire.toFixed(1)+" anni":"non raggiunto entro 100 anni"}</small></span><b>${fmt0(target)} €</b></li>
+      <li><span>Al traguardo FIRE<small>${yFire!=null?"tra "+yFire.toFixed(1).replace(".",",")+" anni":"non raggiunto entro 100 anni"}</small></span><b>${fmt0(target)} €</b></li>
     </ul></div>
   ${versatoMercatoHTML()}
   <div class="card"><p class="note">Tutti gli importi sono in potere d'acquisto di oggi: il rendimento usato è quello reale (rendimento meno inflazione). Il prelievo sicuro è una regola pratica, non una garanzia: i mercati non salgono in linea retta e le sequenze negative dei primi anni pesano più di quelle successive. Sono stime, non consulenza finanziaria.</p></div>`;
