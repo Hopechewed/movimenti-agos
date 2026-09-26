@@ -1980,6 +1980,7 @@ function renderRp(){
   const series=ms.map(m=>{ const x=D.month(m); return {label:MESI_S[+m.slice(5,7)-1],a:x.entrate,b:x.spese}; });
   h+=`<div class="card"><h3>Confronto mese su mese<small>${yearNow}</small></h3>${barsSVG(series)}<div class="lg"><span><i style="background:#1F6FD0"></i>Entrate</span><span><i style="background:#E4572E"></i>Spese</span></div></div>`;
   h+=`<div class="card"><h3>Report PDF</h3><p style="font-size:13.5px;color:var(--ink-2);margin:0 0 10px">Un resoconto completo del mese chiuso: patrimonio, spese per categoria, trend, investimenti e stato FIRE.</p><button class="btn" id="btnReport" style="width:100%">📄 Genera report PDF</button></div>`;
+  h+=`<div class="card"><h3>Esporta Excel</h3><p style="font-size:13.5px;color:var(--ink-2);margin:0 0 10px">Scarica un file .xlsx con tutti i movimenti, il riepilogo mensile, categorie, conti e asset.</p><button class="btn" id="btnExportXlsx" style="width:100%">📊 Esporta Excel</button></div>`;
   // storico patrimonio
   if(D.storico.length>=2) h+=`<div class="pat" id="patCard"></div><div class="pat" id="compCard"></div><div class="pat" id="linesCard"></div>`;
   body.innerHTML=`<div class="ptr ${R.loading?"on":""}"><span><i class="spin"></i>Aggiorno da Excel…</span></div>`+h;
@@ -1987,7 +1988,8 @@ function renderRp(){
   { const oc=$("outCard"); if(oc&&oc.querySelector(".donutwrap")) bindDonut(oc.querySelector(".donutwrap"),items,M.spese,"Spese"); const ic=$("inCard"); if(ic&&ic.querySelector(".donutwrap")) bindDonut(ic.querySelector(".donutwrap"),inItems,M.entrate,"Entrate"); }
   if(D.storico.length>=2){ const pc=$("patCard"); if(pc) pc._bound=false; initPat(D.storico); initComp(); initLines(); }
   const br=$("btnReport"); if(br) br.onclick=openReport;
-  
+  const bx=$("btnExportXlsx"); if(bx) bx.onclick=exportExcel;
+
   const bp=$("btnPacOpen"); if(bp) bp.onclick=openPac;
   const bz=$("btnPrezziOpen"); if(bz) bz.onclick=openPrezzi;
   const bb=$("btnBudget"); if(bb) bb.onclick=openBudget; const bbi=$("btnBudgetIn"); if(bbi) bbi.onclick=openBudget;
@@ -2675,6 +2677,54 @@ async function genReport(){
   btn.disabled=false; btn.textContent="Genera PDF";
 }
 $("btnRepGo").onclick=genReport;
+
+// ================= ESPORTAZIONE EXCEL =================
+async function exportExcel(){
+  const btn=$("btnExportXlsx"); if(btn){ btn.disabled=true; btn.textContent="Genero…"; }
+  try{
+    await loadXLSX();
+    const D=calc();
+    const wb=XLSX.utils.book_new();
+
+    const mv=[["Data","Descrizione","Categoria","Conto","Importo"]];
+    S.rows.slice().sort((a,b)=>a.d<b.d?-1:(a.d>b.d?1:0)).forEach(r=>mv.push([dateIT(fromISO(r.d)),r.desc,r.cat,r.conto,r.imp]));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(mv),"Movimenti");
+
+    if(D){
+      const rp=[["Mese","Entrate","Spese","Investiti","Risparmio","Tasso risparmio"]];
+      D.months.forEach(m=>{ const x=D.month(m); rp.push([monthLabel(m),x.entrate,x.spese,x.investiti,x.risparmio,Math.round(x.tasso*1000)/10+"%"]); });
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rp),"Riepilogo mensile");
+    }
+
+    const ct=[["Nome","Tipo","Budget mensile"]];
+    S.cats.forEach(c=>ct.push([c.name,c.tipo,c.budget||0]));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ct),"Categorie");
+
+    const cn=[["Nome","Saldo iniziale","Saldo attuale"]];
+    const saldiMap={}; if(D) D.saldi.forEach(a=>saldiMap[a.name]=a.saldo);
+    S.accounts.forEach(a=>cn.push([a.name,a.saldo0||0,saldiMap[a.name]!=null?saldiMap[a.name]:(a.saldo0||0)]));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(cn),"Conti");
+
+    const assetSrc=(D?D.assets:S.assets)||[];
+    if(assetSrc.length){
+      const as=[["Nome","Quantità","Prezzo","Valore"]];
+      assetSrc.forEach(a=>as.push([a.name,a.qty!=null?a.qty:"",a.price!=null?a.price:"",a.value]));
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(as),"Asset");
+    }
+
+    const buf=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+    const name=`MovimentiAgos_${dateISO(today())}.xlsx`;
+    const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    const url=URL.createObjectURL(blob);
+    let condiviso=false;
+    try{ const file=new File([blob],name,{type:blob.type});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:name}); condiviso=true; }
+    }catch(e){}
+    if(!condiviso){ const a=document.createElement("a"); a.href=url; a.download=name; a.rel="noopener"; document.body.appendChild(a); a.click(); a.remove(); }
+    toast("Excel generato");
+  }catch(e){ toast(e.message||"Generazione Excel non riuscita",true); }
+  if(btn){ btn.disabled=false; btn.textContent="📊 Esporta Excel"; }
+}
 
 // ================= FIRE =================
 const FIRE_DEF={mode:"proj",cap:null,pac:null,rate:7,infl:2,spesa:null,swr:4,anni:20,base:"asset"};
