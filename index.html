@@ -1246,29 +1246,31 @@ function pianoHint(p){
 }
 function piano2rule(p){ return {id:"piano:"+p.id,planId:p.id,piano:true,type:p.type,from:p.from,dow:p.dow,days:p.days,desc:p.desc,cat:p.cat,conto:p.conto,imp:p.imp,hint:pianoHint(p)}; }
 // ---------- saldo previsionale: spese ricorrenti già previste ma non ancora confermate ----------
-function pianoConfermatoOggi(p,now){
-  const rows=S.rows.filter(r=>r.planId===p.id);
-  if(p.type==="interval"){ if(!rows.length) return false; const last=rows.reduce((a,b)=>a.d>b.d?a:b); return daysBetween(fromISO(last.d),now)<(p.days||30)-2; }
-  if(p.type==="weekly"){ const since=(now.getDay()-(p.dow||0)+7)%7; const start=new Date(now); start.setDate(now.getDate()-since); const startISO=dateISO(start); return rows.some(r=>r.d>=startISO); }
-  const ym=dateISO(now).slice(0,7); return rows.some(r=>r.d.slice(0,7)===ym);
-}
-function pianoPendente(p,now){
-  if(!pianoAttivo(p,now)) return false;
-  if(p.type==="interval") return !(p.inizio&&dateISO(now)<p.inizio)&&!pianoConfermatoOggi(p,now);
-  if(p.type==="weekly"){
-    const since=(now.getDay()-(p.dow||0)+7)%7; const start=new Date(now); start.setDate(now.getDate()-since);
-    const fine=dateISO(new Date(start.getFullYear(),start.getMonth(),start.getDate()+6));
-    if(p.inizio&&p.inizio>fine) return false;
-    return !pianoConfermatoOggi(p,now);
-  }
-  const ym=dateISO(now).slice(0,7);
-  if(p.inizio&&p.inizio.slice(0,7)>ym) return false;
-  return !pianoConfermatoOggi(p,now);
-}
-function pianoInScadenza(p,now){ return p.type==="monthly"?now.getDate()>=(p.from||1):true; }
-function pianiPendenti(now){ now=now||today(); return S.piani.filter(p=>pianoPendente(p,now)); }
 function pianoSignedAmt(p){ const tipo=(S.cats.find(c=>c.name===p.cat)||{}).tipo||"Spesa"; return tipo==="Entrata"?p.imp:-p.imp; }
-function previsionaleDelta(now){ return pianiPendenti(now).reduce((a,p)=>a+pianoSignedAmt(p),0); }
+function pianoInScadenza(p,now){ return p.type==="monthly"?now.getDate()>=(p.from||1):true; }
+// quante volte ricorre p nel mese ym (YYYY-MM)
+function occorrenzeMese(p,ym){
+  const [y,m]=ym.split("-").map(Number); const dim=new Date(y,m,0).getDate();
+  if(p.type==="weekly"){ let n=0; for(let d=1;d<=dim;d++) if(new Date(y,m-1,d).getDay()===(p.dow||0)) n++; return n; }
+  if(p.type==="interval") return Math.max(0,Math.floor(dim/(p.days||30)));
+  return 1;
+}
+// il piano è attivo (anche solo in parte) durante il mese ym, indipendentemente da "oggi"
+function pianoAttivoNelMese(p,ym){
+  if(p.attivo===false) return false;
+  if(p.inizio&&p.inizio.slice(0,7)>ym) return false;
+  if(p.fine&&p.fine.tipo==="data"&&p.fine.d&&p.fine.d.slice(0,7)<ym) return false;
+  return true;
+}
+function pianiDelMese(ym){ return S.piani.filter(p=>pianoAttivoNelMese(p,ym)); }
+// quanto di questo piano è già stato registrato davvero in quel mese (segno incluso)
+function confermatoNelMeseImp(p,ym){ return S.rows.filter(r=>r.planId===p.id&&r.d.slice(0,7)===ym).reduce((a,r)=>a+r.imp,0); }
+// importo previsto per il piano in quel mese, e quanto ne resta da confermare
+function pianoPrevistoMese(p,ym){ return pianoSignedAmt(p)*occorrenzeMese(p,ym); }
+function pianoResiduoMese(p,ym){ return pianoPrevistoMese(p,ym)-confermatoNelMeseImp(p,ym); }
+function previstoResiduoMese(ym){ return pianiDelMese(ym).reduce((a,p)=>a+pianoResiduoMese(p,ym),0); }
+// per il blocco "in scadenza oggi" (solo mese corrente, usato in Riepilogo per il saldo di adesso)
+function pianiPendenti(now){ now=now||today(); const ym=dateISO(now).slice(0,7); return pianiDelMese(ym).filter(p=>Math.abs(pianoResiduoMese(p,ym))>0.005); }
 function allRules(){
   const H=allHist(); const rules=[];
   const now=today();
@@ -1978,7 +1980,7 @@ function renderRp(){
   if(isCur){
     const oggi=today(); const pend=pianiPendenti(oggi);
     if(pend.length){
-      const delta=previsionaleDelta(oggi), prev=D.patrimonio+delta;
+      const delta=previstoResiduoMese(curM), prev=D.patrimonio+delta;
       h+=`<div class="grid3" style="grid-template-columns:1fr 1fr"><div><small>Saldo reale</small><b>${fmtIT(D.patrimonio)} €</b></div><div><small>Saldo previsionale</small><b>${fmtIT(prev)} €</b></div></div>`;
       h+=`<ul class="rows" style="margin-top:4px">${pend.map(p=>{ const amt=pianoSignedAmt(p), due=pianoInScadenza(p,oggi);
         return `<li><span>${esc(p.desc)}${due?` <small>da confermare in “Nuovo”</small>`:` <small>previsto${p.type==="monthly"?" il "+p.from+" del mese":""}</small>`}</span><b class="${amt>=0?"in":""}">${amt>=0?"+":"−"}${fmtIT(Math.abs(amt))} €</b></li>`; }).join("")}</ul>`;
@@ -1992,6 +1994,17 @@ function renderRp(){
   // mese
   h+=`<div class="card"><div class="mnav"><button id="mPrev">‹</button><b>${monthLabel(R.month)}</b><button id="mNext">›</button></div>
     <div class="kpi"><div><small>Entrate</small><b><span class="cnt" data-v="${M.entrate}">${fmt0(M.entrate)}</span> €</b></div><div><small>Spese</small><b><span class="cnt" data-v="${M.spese}">${fmt0(M.spese)}</span> €</b></div><div><small>Investiti</small><b><span class="cnt" data-v="${M.investiti}">${fmt0(M.investiti)}</span> €</b></div><div><small>Risparmio · ${Math.round(M.tasso*100)}%</small><b><span class="cnt" data-v="${M.risparmio}">${fmt0(M.risparmio)}</span> €</b></div></div></div>`;
+  // spese ricorrenti previste in questo mese (qualunque mese si stia sfogliando)
+  { const pMese=pianiDelMese(R.month);
+    if(pMese.length){
+      const tot=previstoResiduoMese(R.month);
+      h+=`<div class="card"><h3>Spese ricorrenti<small>${monthLabel(R.month)}</small></h3><ul class="rows">${pMese.map(p=>{
+        const n=occorrenzeMese(p,R.month), fatto=confermatoNelMeseImp(p,R.month), resid=pianoResiduoMese(p,R.month);
+        const stato=Math.abs(resid)<0.005?"confermata":(Math.abs(fatto)>0.005?"parzialmente confermata":"");
+        return `<li><span>${esc(p.desc)}${n>1?` <small>×${n}</small>`:""}${stato?` <small>${stato}</small>`:""}</span><b class="${resid>0.005?"in":""}">${resid>=0?"+":"−"}${fmtIT(Math.abs(resid))} €</b></li>`;
+      }).join("")}<li class="tot"><span>Ancora da confermare</span><b class="${tot>0.005?"in":""}">${tot>=0?"+":"−"}${fmtIT(Math.abs(tot))} €</b></li></ul></div>`;
+    }
+  }
   // entrate del mese
   const inItems=M.byCatIn.map(c=>({name:c.name,emoji:c.emoji,v:c.incassato}));
   if(M.byCatIn.length) h+=`<div class="card" id="inCard"><h3>Entrate<small>${monthLabel(R.month)}</small><button class="btn" id="btnBudgetIn" style="float:right;margin:-6px 0 0;padding:6px 10px;min-height:30px;font-size:13px">✎ Obiettivi</button></h3>${M.entrate>0?donutHTML(inItems,M.entrate,"Entrate"):""}<ul class="rows" style="margin-top:10px">${M.byCatIn.map(c=>expLi(c.name,`<span>${c.emoji?c.emoji+" ":""}${esc(c.name)}${c.budget?`<small>obiettivo ${fmt0(c.budget)} € · ${Math.round(c.incassato/c.budget*100)}%</small><div class="bar"><i class="ok" style="width:${Math.min(100,c.incassato/c.budget*100)}%"></i></div>`:`<small>nessun obiettivo</small>`}</span>`,`<b style="color:var(--in)">${fmtIT(c.incassato)} €</b>`)).join("")}${M.byCatInv.length?M.byCatInv.map(c=>expLi(c.name,`<span>${c.emoji?c.emoji+" ":""}${esc(c.name)}<small>versato, non una spesa${c.budget?` · piano ${fmt0(c.budget)} €`:""}</small>${c.budget?`<div class="bar"><i style="width:${Math.min(100,c.versato/c.budget*100)}%"></i></div>`:""}</span>`,`<b>${fmtIT(c.versato)} €</b>`)).join(""):""}<li class="tot"><span>Totale entrate</span><b style="color:var(--in)">${fmtIT(M.entrate)} €</b></li></ul></div>`;
