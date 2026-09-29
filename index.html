@@ -1265,7 +1265,7 @@ function syncLocal(){
   CONTI.length=0; S.accounts.forEach(a=>CONTI.push(a.name));
   S.cache={ts:Date.now(),rows:S.rows,cats:S.cats,accounts:S.accounts,assets:S.assets,assetDate:S.assetDate,storico:S.storico,local:true};
   // istantanea mensile del patrimonio (primo accesso del mese) per i grafici nel tempo
-  try{ const D=calc(); if(D){ const k=dateISO(today()).slice(0,7)+"-01"; if(!S.storico.some(p=>p.d===k)){ S.storico.push({d:k,v:Math.round(D.patrimonio*100)/100,a:Math.round(D.assetTot*100)/100,t:dateISO(today()),ad:S.assetDate||null}); S.storico.sort((a,b)=>a.d<b.d?-1:1); save(); } } }catch(e){}
+  try{ const D=calc(); if(D){ const k=dateISO(today()).slice(0,7)+"-01"; if(Math.abs(D.patrimonio)>0.5&&!S.storico.some(p=>p.d===k&&Math.abs(p.v)>0.5)){ S.storico=S.storico.filter(p=>p.d!==k); S.storico.push({d:k,v:Math.round(D.patrimonio*100)/100,a:Math.round(D.assetTot*100)/100,t:dateISO(today()),ad:S.assetDate||null}); S.storico.sort((a,b)=>a.d<b.d?-1:1); save(); } } }catch(e){}
 }
 function newId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
@@ -1734,7 +1734,8 @@ async function refreshExcel(force){
 
 // ---------- storico mensile del patrimonio ----------
 function mergeStorico(st){
-  const out=(st||[]).map(p=>({...p})); const have=new Set(out.map(p=>p.d.slice(0,7)));
+  // una fotografia a zero è stata scattata ad app ancora vuota: come confronto produrrebbe variazioni assurde
+  const out=(st||[]).filter(p=>Math.abs(p.v)>0.5).map(p=>({...p})); const have=new Set(out.map(p=>p.d.slice(0,7)));
   for(const r of STORICO_PRE){ if(have.has(r[0])) continue; out.push({d:r[0]+"-01",v:Math.round((r[1]+r[2]+r[3]+r[4])*100)/100,pre:true}); }
   return out.sort((a,b)=>a.d<b.d?-1:a.d>b.d?1:0);
 }
@@ -1800,16 +1801,16 @@ function serieComposizione(){
   const liquidNames=D.saldi.map(a=>a.name), cards=D.carte;
   const acc0=name=>{ const a=C.accounts.find(x=>x.name===name); return a?a.saldo0:0; };
   const saldo0=C.accounts.filter(a=>!a.addebita&&!CARTE_EXTRA.some(x=>x.name===a.name)&&liquidNames.includes(a.name)).reduce((a,x)=>a+x.saldo0,0);
-  const liqAt=iso=>{ // liquidità all'inizio del giorno iso (movimenti precedenti + addebiti carte già passati)
-    let v=saldo0+rows.filter(r=>liquidNames.includes(r.conto)&&r.d<iso).reduce((a,r)=>a+r.imp,0);
-    cards.forEach(c=>{ const gg=c.giorno||15, lag=c.ritardo||MESI_RITARDO[c.name]||1;
-      for(let m=0;m<12;m++){ const spend=rows.filter(r=>r.conto===c.name&&r.d.startsWith(`${today().getFullYear()}-${pad2(m+1)}`)).reduce((a,r)=>a+r.imp,0);
-        const add=dateISO(new Date(today().getFullYear(),m+lag,gg)); if(add<iso) v+=spend; } });
-    return v; };
+  // stato delle carte all'inizio del giorno iso, con le stesse regole di calc(): estratto, data di addebito, pregresso
+  const carteStato=iso=>{ let settled=0,pend=0; cards.forEach(c=>{ const byM={};
+      rows.filter(r=>r.conto===c.name&&r.d<iso).forEach(r=>{ const k=estrattoMese(c,r.d); byM[k]=(byM[k]||0)+r.imp; });
+      Object.keys(byM).forEach(k=>{ if(dateISO(cardDue(c,k))<iso) settled+=byM[k]; else pend+=byM[k]; });
+      const preg=-(c.saldo0||0); if(Math.abs(preg)>0.004){ if((c.pregressoData||dateISO(today()))<iso) settled+=preg; else pend+=preg; } });
+    return {settled,pend}; };
+  const liqAt=iso=>saldo0+rows.filter(r=>liquidNames.includes(r.conto)&&r.d<iso).reduce((a,r)=>a+r.imp,0)+carteStato(iso).settled;
   const contAt=iso=>acc0("Contanti")+rows.filter(r=>r.conto==="Contanti"&&r.d<iso).reduce((a,r)=>a+r.imp,0);
-  const carteAt=iso=>{ let v=0; cards.forEach(c=>{ const gg=c.giorno||15, lag=c.ritardo||MESI_RITARDO[c.name]||1;
-      for(let m=0;m<12;m++){ const spend=rows.filter(r=>r.conto===c.name&&r.d.startsWith(`${today().getFullYear()}-${pad2(m+1)}`)&&r.d<iso).reduce((a,r)=>a+r.imp,0);
-        const add=dateISO(new Date(today().getFullYear(),m+lag,gg)); if(add>=iso) v+=spend; } }); return v; };
+  const carteAt=iso=>carteStato(iso).pend;
+  const creditoAt=iso=>-rows.filter(r=>r.d<iso&&(r.cat===CAT_TRASFERTE||tipoCat(r.cat)==="Anticipo")).reduce((a,r)=>a+r.imp,0);
   const PRE={}; STORICO_PRE.forEach(r=>{ PRE[r[0]]={contanti:r[1],conti:r[2],crypto:r[3],inv:r[4]}; });
   const t=today(), tISO=dateISO(t), tM=tISO.slice(0,7);
   const shareNow=D.assetTot>0?D.crypto/D.assetTot:0;
@@ -1821,8 +1822,10 @@ function serieComposizione(){
     const k=Math.max(0,Math.min(1,(mIdx(m)-mIdx(lastPreM))/span)); return {s:lastPreShare+(shareNow-lastPreShare)*k,stima:true}; };
   const pts=[];
   D.storico.forEach(p=>{ const m=p.d.slice(0,7); let c=null;
-    if(!p.pre){ const liq=liqAt(p.d), carte=carteAt(p.d), cont=contAt(p.d); const asset=p.v-liq-carte; const sh=shareAt(m); const cry=asset*sh.s;
-      c={liq,carte,asset,contanti:cont,conti:liq-cont+carte,inv:asset-cry,crypto:cry,stima:sh.stima}; }
+    // la fotografia è scattata al primo accesso del mese (p.t): i conti si ricostruiscono a fine di quel giorno
+    if(!p.pre){ const iso=p.t?dateISO(new Date(fromISO(p.t).getTime()+86400000)):p.d;
+      const liq=liqAt(iso), carte=carteAt(iso), cont=contAt(iso), cred=creditoAt(iso); const asset=p.v-liq-carte-cred; const sh=shareAt(m); const cry=asset*sh.s;
+      c={liq,carte,asset,contanti:cont,conti:liq-cont+carte+cred,inv:asset-cry,crypto:cry,stima:sh.stima}; }
     else if(PRE[m]){ const q=PRE[m]; const sum=q.contanti+q.conti+q.crypto+q.inv; const k=sum>0&&Math.abs(sum-p.v)>1?p.v/sum:1;
       c={liq:(q.contanti+q.conti)*k,carte:0,asset:(q.crypto+q.inv)*k,contanti:q.contanti*k,conti:q.conti*k,inv:q.inv*k,crypto:q.crypto*k,stima:false}; }
     pts.push({d:p.d,tot:p.v,kind:"hist",...(c||{liq:null,asset:null,contanti:null})}); });
@@ -1900,6 +1903,7 @@ function makeTimeChart(opts){
     opts.series.forEach(sr=>{ let d="", started=false, baseD="";
       for(let i=0;i<opts.n;i++){ const v=opts.getY(i,sr.key); if(v==null){ started=false; continue; }
         d+=(started?"L":"M")+(i*U)+" "+Yof(v).toFixed(1)+" "; started=true; }
+      if(!d) return; // serie senza dati: niente path vuoti (davano errore SVG)
       if(sr.area){ // area impilata: chiude sulla base (serie sotto) o sullo zero
         let lower=""; for(let i=opts.n-1;i>=0;i--){ const v=opts.getY(i,sr.key); if(v==null) continue; const bv=sr.baseKey?opts.getY(i,sr.baseKey):null; lower+="L"+(i*U)+" "+(bv==null?(H-pb):Yof(bv)).toFixed(1)+" "; }
         paths+=`<path d="${d}${lower}Z" fill="${sr.color}" fill-opacity="${sr.alpha||.35}" stroke="none"/>`; }
@@ -2146,7 +2150,7 @@ function renderRp(){
   }
   const SCx=serieComposizione(); const prevPt=SCx?[...SCx.pts].reverse().find(p=>p.kind==="hist"&&p.d<dateISO(today()).slice(0,7)+"-02"&&p.liq!=null):null;
   const dLiq=prevPt?D.liquidita-prevPt.liq:null, dAss=prevPt?D.assetTot-prevPt.asset:null;
-  const delta=v=>v==null?"":`<em class="dv ${v>=0?"up":"down"}">${v>=0?"+":"−"}${fmt0(Math.abs(v))} € sul mese scorso</em>`;
+  const delta=v=>v==null||Math.abs(v)<0.5?"":`<em class="dv ${v>=0?"up":"down"}">${v>=0?"+":"−"}${fmt0(Math.abs(v))} € da inizio mese</em>`;
   h+=`<div class="grid3"><div><small>Liquidità</small><b><span class="cnt" data-v="${D.liquidita}">${fmt0(D.liquidita)}</span> €</b>${delta(dLiq)}</div><div><small>Carte da addebitare</small><b><span class="cnt" data-v="${D.carteTot}">${fmt0(D.carteTot)}</span> €</b></div><div><small>Asset</small><b><span class="cnt" data-v="${D.assetTot}">${fmt0(D.assetTot)}</span> €</b>${delta(dAss)}</div>${(()=>{ const sp=spendibile(D); return `<div><small>Spendibile</small><b><span class="cnt" data-v="${sp}">${fmt0(sp)}</span> €</b><em class="dv">${fmt0(Math.max(0,sp)/giorniRimasti())} €/giorno fino a fine mese</em></div>`; })()}${D.trasferte.credito>0.005?`<div><small>Da rimborsare</small><b>${fmt0(D.trasferte.credito)} €</b></div>`:""}</div></div>`;
   h+=`<div class="sync">${S.rows.length} movimenti salvati su questo telefono</div>`;
   const CF=isCur?cashflow(90):null; if(CF) h+=lowestHTML(CF,false);
