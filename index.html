@@ -378,6 +378,12 @@
   .rp .rows li.sec b{font-size:14px;letter-spacing:0;color:var(--ink)}
   .rp .rows li.sec small{text-transform:none;letter-spacing:0;font-weight:500}
   .rp .rows li.done{opacity:.55}
+  .rp .card.lavlink{display:flex;align-items:center;gap:10px;cursor:pointer}
+  .rp .card.lavlink span{flex:1;font-weight:600;font-size:15px}
+  .rp .card.lavlink span small{display:block;font-weight:500;font-size:12.5px;color:var(--ink-2)}
+  .rp .card.lavlink b{font-family:ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+  .rp .card.lavlink em{font-style:normal;font-size:22px;color:var(--ink-2);line-height:1}
+  .navmini.n7 button span{font-size:8.5px;letter-spacing:-.01em}
   .rp .kpi div.prev{background:transparent;border:1.5px dashed var(--line)}
   .rp .rows li b{font-family:ui-rounded,-apple-system,system-ui,sans-serif;font-weight:600}
   .rp .rows li small{color:var(--ink-2);font-size:12.5px;display:block}
@@ -951,6 +957,10 @@
   <div id="lavBody"></div>
 </div>
 
+<div class="sheet rp" id="sheetJob">
+  <div id="jobBody"></div>
+</div>
+
 <div class="sheet rp" id="sheetBud">
   <div id="budBody"></div>
 </div>
@@ -1327,7 +1337,7 @@ function pianoHint(p){
   return base;
 }
 function piano2rule(p){ return {id:"piano:"+p.id,planId:p.id,piano:true,type:p.type,from:p.from,dow:p.dow,days:p.days,data:p.data,desc:p.desc,cat:p.cat,conto:p.conto,imp:p.imp,hint:pianoHint(p)}; }
-function tipoCat(n){ return (S.cats.find(c=>c.name===n)||{}).tipo||"Spesa"; }
+function tipoCat(n){ return ((S.cats||[]).find(c=>c.name===n)||{}).tipo||"Spesa"; }
 // le categorie di lavoro compaiono solo a chi ha segnato una carta come "di lavoro"
 function assicuraCategorieLavoro(){ let add=false;
   [[CAT_LAV,"💼","Anticipo"],[CAT_RIMB,"🏦","Anticipo"],[CAT_IND,"🧳","Entrata"]].forEach(([name,emoji,tipo])=>{ if(!S.cats.some(c=>c.name===name)){ S.cats.push({name,emoji,tipo,budget:0}); add=true; } });
@@ -1754,7 +1764,7 @@ function calc(){
   // credito verso l'azienda: anticipi spesi meno rimborsi ricevuti. Conta nel patrimonio, non nello spendibile
   const trasfCredito=-sum(r=>r.cat===CAT_TRASFERTE||tipoOf(r.cat)==="Anticipo");
   const trasfPerConto={}; rows.filter(r=>r.cat===CAT_TRASFERTE).forEach(r=>{ trasfPerConto[r.conto]=(trasfPerConto[r.conto]||0)+r.imp; });
-  const trasferte={ daAddebitare:sum(r=>r.conto===CONTO_TRASFERTE), credito:trasfCredito, righe:rows.filter(r=>r.cat===CAT_TRASFERTE).length, perConto:trasfPerConto };
+  const trasferte={ daAddebitare:sum(r=>r.conto===CONTO_TRASFERTE), credito:trasfCredito, righe:rows.filter(r=>r.cat===CAT_TRASFERTE||tipoOf(r.cat)==="Anticipo").length, perConto:trasfPerConto };
   const liquidita=liquid.reduce((a,x)=>a+x.saldo,0);
   const carte=cards;
   const carteTot=carte.reduce((a,x)=>a+x.daAddebitare,0);
@@ -2140,7 +2150,7 @@ function renderRp(){
   h+=`<div class="grid3"><div><small>Liquidità</small><b><span class="cnt" data-v="${D.liquidita}">${fmt0(D.liquidita)}</span> €</b>${delta(dLiq)}</div><div><small>Carte da addebitare</small><b><span class="cnt" data-v="${D.carteTot}">${fmt0(D.carteTot)}</span> €</b></div><div><small>Asset</small><b><span class="cnt" data-v="${D.assetTot}">${fmt0(D.assetTot)}</span> €</b>${delta(dAss)}</div>${(()=>{ const sp=spendibile(D); return `<div><small>Spendibile</small><b><span class="cnt" data-v="${sp}">${fmt0(sp)}</span> €</b><em class="dv">${fmt0(Math.max(0,sp)/giorniRimasti())} €/giorno fino a fine mese</em></div>`; })()}${D.trasferte.credito>0.005?`<div><small>Da rimborsare</small><b>${fmt0(D.trasferte.credito)} €</b></div>`:""}</div></div>`;
   h+=`<div class="sync">${S.rows.length} movimenti salvati su questo telefono</div>`;
   const CF=isCur?cashflow(90):null; if(CF) h+=lowestHTML(CF,false);
-  if(isCur) h+=lavoroHTML();
+  if(isCur) h+=lavoroLinkHTML();
   // mese
   const previstoMese=previstoResiduoMese(R.month), speseAttese=Math.max(0,-previstoMese);
   const addCarte=addebitiCarteMese(R.month), totCarte=addCarte.reduce((a,x)=>a+x.imp,0);
@@ -2501,9 +2511,13 @@ const NAV_ICONS={"main": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"curr
 function storiesUnseen(){ const o=today(), pm=new Date(o.getFullYear(),o.getMonth()-1,1); return S.storiesSeen!==`${pm.getFullYear()}-${pad2(pm.getMonth()+1)}`; }
 function markStoriesSeen(){ const o=today(), pm=new Date(o.getFullYear(),o.getMonth()-1,1); S.storiesSeen=`${pm.getFullYear()}-${pad2(pm.getMonth()+1)}`; save(); const h=$("hdr"); if(h){ const b=h.querySelector('button[data-go="stories"]'); if(b) b.classList.remove("new"); } }
 NAV_ICONS.bud="<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 7h15a3 3 0 0 1 3 3v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/><path d=\"M3 7l12-3v3\"/><circle cx=\"16.5\" cy=\"14\" r=\"1.3\"/></svg>";
+NAV_ICONS.lav="<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"7\" width=\"18\" height=\"13\" rx=\"2.5\"/><path d=\"M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 12.5h18\"/></svg>";
 const NAV_ORDER=[["main","Nuovo"],["rp","Riepilogo"],["bud","Budget"],["mv","Movimenti"],["fire","FIRE"],["stories","Storie"]];
+// "Lavoro" compare solo a chi ha segnato una carta di lavoro (o ha già dati di lavoro), prima di FIRE
+function navOrder(){ if(!lavoroAttivo()) return NAV_ORDER; const o=NAV_ORDER.slice(); o.splice(o.findIndex(x=>x[0]==="fire"),0,["lav","Lavoro"]); return o; }
 function navHTML(active){
-  return `<div class="navmini">${NAV_ORDER.map(([k,t])=>`<button data-go="${k}" class="${k===active?"on":""}${k==="stories"?" st"+(storiesUnseen()?" new":""):""}" aria-label="${t}">${k==="stories"?`<span class="stwrapi">${NAV_ICONS[k]}</span>`:NAV_ICONS[k]}<span>${t}</span></button>`).join("")}</div>`;
+  const NAV=navOrder();
+  return `<div class="navmini${NAV.length>6?" n7":""}">${NAV.map(([k,t])=>`<button data-go="${k}" class="${k===active?"on":""}${k==="stories"?" st"+(storiesUnseen()?" new":""):""}" aria-label="${t}">${k==="stories"?`<span class="stwrapi">${NAV_ICONS[k]}</span>`:NAV_ICONS[k]}<span>${t}</span></button>`).join("")}</div>`;
 }
 function paintNav(active){
   const h=$("hdr"); if(!h) return;
@@ -2527,7 +2541,7 @@ function setActiveNav(active){
     else { ind.style.height=""; ind.style.width=b.offsetWidth+"px"; ind.style.transform=`translateX(${b.offsetLeft}px)`; } };
   place(); requestAnimationFrame(place);
 }
-const SHEETS=["sheetRp","sheetBud","sheetLav","sheetMv","sheetFire","sheetLog","sheetSettings","sheetPac","sheetRep","sheetPrezzi","sheetBudget","sheetConti","sheetCats","sheetPiani","sheetEdit"];
+const SHEETS=["sheetRp","sheetBud","sheetJob","sheetLav","sheetMv","sheetFire","sheetLog","sheetSettings","sheetPac","sheetRep","sheetPrezzi","sheetBudget","sheetConti","sheetCats","sheetPiani","sheetEdit"];
 function openSheet(id){
   const target=$(id); if(!target) return;
   SHEETS.forEach(sid=>{ const el=$(sid); if(!el||sid===id) return; if(el.classList.contains("open")){ el.classList.remove("open"); el.classList.add("leaving"); setTimeout(()=>el.classList.remove("leaving"),340); } });
@@ -2568,7 +2582,7 @@ document.querySelectorAll(".sheet").forEach(sh=>{ let x0=null,y0=null;
 function goTab(t){
   haptic(); setActiveNav(t);
   if(t==="main"){ SHEETS.forEach(sid=>{ const el=$(sid); if(el&&el.classList.contains("open")) el.classList.remove("open"); }); paintNav(); return; }
-  if(t==="rp") openRp(); else if(t==="bud"){ syncLocal(); openSheet("sheetBud"); renderBud(); } else if(t==="mv") openMv(); else if(t==="stories"){ setActiveNav("main"); openStories(); } else if(t==="fire"){ openSheet("sheetFire"); renderFire(); if(S.share) doRefresh(false); }
+  if(t==="rp") openRp(); else if(t==="lav") openLavoro(); else if(t==="bud"){ syncLocal(); openSheet("sheetBud"); renderBud(); } else if(t==="mv") openMv(); else if(t==="stories"){ setActiveNav("main"); openStories(); } else if(t==="fire"){ openSheet("sheetFire"); renderFire(); if(S.share) doRefresh(false); }
   paintNav();
 }
 
@@ -3046,30 +3060,75 @@ function versatoMercatoHTML(){
 // Le spese di lavoro muovono conti e carte come tutte le altre (l'addebito carta arriva comunque),
 // ma non sono spese tue: finiscono in un credito verso l'azienda che il bonifico di rimborso chiude.
 // Né il credito né le indennità attese entrano in spendibile e cash-flow: non si sa quando arrivano.
-function lavoroAttivo(){ return S.accounts.some(a=>a.lavoro)||S.rows.some(r=>tipoCat(r.cat)==="Anticipo")||(S.trasf||[]).length>0; }
-function creditoLavoro(){
+function lavoroAttivo(){ return (S.accounts||[]).some(a=>a.lavoro)||(S.rows||[]).some(r=>tipoCat(r.cat)==="Anticipo")||(S.trasf||[]).length>0; }
+// Unica fonte per il credito di lavoro: i rimborsi coprono le spese in ordine cronologico (la più vecchia per prima).
+// tot è lo stesso netto che calc() mette nel patrimonio; da qui escono anche le spese in attesa e il tempo medio di rimborso.
+function analisiLavoro(){
   const o=dateISO(today()), rs=S.rows.filter(r=>r.d<=o&&tipoCat(r.cat)==="Anticipo");
-  const tot=-rs.reduce((a,r)=>a+r.imp,0);
-  // i rimborsi coprono prima le spese più vecchie: quello che resta scoperto è ancora in attesa
-  let rimb=rs.filter(r=>r.imp>0).reduce((a,r)=>a+r.imp,0), vecchia=null, n=0;
-  rs.filter(r=>r.imp<0).sort((a,b)=>a.d<b.d?-1:1).forEach(r=>{ const x=-r.imp; if(rimb>=x-0.004) rimb-=x; else { rimb=0; n++; if(!vecchia) vecchia=r.d; } });
-  return {tot:Math.max(0,tot),vecchia,n};
+  const byD=(a,b)=>a.r.d<b.r.d?-1:a.r.d>b.r.d?1:0;
+  const spese=rs.filter(r=>r.imp<0).map(r=>({r,resto:-r.imp,coperta:null})).sort(byD);
+  const rimb=rs.filter(r=>r.imp>0).map(r=>({r,disp:r.imp})).sort(byD);
+  let j=0;
+  for(const s of spese){ while(s.resto>0.004&&j<rimb.length){ const x=Math.min(s.resto,rimb[j].disp); s.resto-=x; rimb[j].disp-=x; if(s.resto<=0.004) s.coperta=rimb[j].r; if(rimb[j].disp<=0.004) j++; } }
+  const pending=spese.filter(s=>s.resto>0.004), pagate=spese.filter(s=>s.coperta&&!s.coperta.chiusura);
+  const lag=pagate.length?pagate.reduce((a,s)=>a+Math.max(0,daysBetween(fromISO(s.r.d),fromISO(s.coperta.d))),0)/pagate.length:null;
+  return {tot:Math.max(0,-rs.reduce((a,r)=>a+r.imp,0)),pending,vecchia:pending.length?pending[0].r.d:null,n:pending.length,lag,nLag:pagate.length};
 }
+function creditoLavoro(){ const a=analisiLavoro(); return {tot:a.tot,vecchia:a.vecchia,n:a.n}; }
 function indennitaAttese(){ return (S.trasf||[]).filter(t=>!t.pagata).sort((a,b)=>a.d<b.d?-1:1); }
 function bancaPredefinita(){ const l=S.accounts.filter(a=>!a.addebita).map(a=>a.name); return l.includes(S.defConto)?S.defConto:(l[0]||""); }
 function nuovaRiga(d,desc,cat,conto,imp){ S.rows.push({id:newId(),d,desc,cat,conto,imp:Math.round(imp*100)/100,planId:null}); }
-function lavoroHTML(){
+// in Riepilogo resta solo un rimando: tutto il resto vive nella sezione Lavoro
+function lavoroLinkHTML(){
   if(!lavoroAttivo()) return "";
-  const cr=creditoLavoro(), ind=indennitaAttese(), totInd=ind.reduce((a,t)=>a+t.imp,0), gg=d=>daysBetween(fromISO(d),today());
-  return `<div class="card"><h3>Lavoro e trasferte<small>da incassare</small></h3><ul class="rows">
-    <li><span>Spese da rimborsare<small>${cr.tot>0.005&&cr.vecchia?`${cr.n} ${cr.n===1?"spesa":"spese"} · la più vecchia in attesa da ${gg(cr.vecchia)} giorni`:"nessuna in attesa"}</small></span><b>${fmtIT(cr.tot)} €</b></li>
-    <li><span>Indennità attese<small>${ind.length?`${ind.length} ${ind.length===1?"giorno":"giorni"} di trasferta · stima netta`:"nessun giorno di trasferta segnato"}</small></span><b>${fmtIT(totInd)} €</b></li>
-    <li class="tot"><span>Totale da incassare<small>fuori da spendibile e cash-flow: non si sa quando arriva</small></span><b>${fmtIT(cr.tot+totInd)} €</b></li></ul>
-    <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="lavGiorno" style="flex:1;margin:0">＋ Giorno di trasferta</button><button class="btn" id="lavBonif" style="flex:1;margin:0">Registra bonifico</button></div>
-    ${cr.tot>0.005?`<button class="btn" id="lavChiudi" style="width:100%;margin:8px 0 0;font-size:13px;opacity:.75">Chiudi il residuo come non rimborsato</button>`:""}</div>`;
+  const tot=analisiLavoro().tot+indennitaAttese().reduce((a,t)=>a+t.imp,0);
+  return `<div class="card lavlink" id="goLav" role="button"><span>💼 Lavoro e trasferte<small>spese da rimborsare e indennità attese</small></span><b class="amt">${fmtIT(tot)} €</b><em>›</em></div>`;
 }
-$("sheetLav").querySelector("[data-close]").onclick=()=>{ openRp(); setActiveNav("rp"); };
-function bindLavoro(){ const a=$("lavGiorno"), b=$("lavBonif"), c=$("lavChiudi"); if(a) a.onclick=openLavGiorno; if(b) b.onclick=openLavBonif; if(c) c.onclick=chiudiResiduoLavoro; }
+$("sheetLav").querySelector("[data-close]").onclick=()=>goTab("lav");
+function bindLavoro(){ const a=$("lavGiorno"), b=$("lavBonif"), c=$("lavChiudi"), g=$("goLav"); if(a) a.onclick=openLavGiorno; if(b) b.onclick=openLavBonif; if(c) c.onclick=chiudiResiduoLavoro; if(g) g.onclick=()=>goTab("lav"); }
+// ---------- sezione Lavoro ----------
+let LV={month:null};
+function openLavoro(){ syncLocal(); if(!LV.month) LV.month=dateISO(today()).slice(0,7); openSheet("sheetJob"); renderLavoro(); }
+function renderLavoro(){
+  const body=$("jobBody"), D=calc(); if(!body||!D) return;
+  const t=today(), oggi=dateISO(t), A=analisiLavoro(), ind=indennitaAttese(), totInd=ind.reduce((a,x)=>a+x.imp,0);
+  const gg=d=>daysBetween(fromISO(d),t), sg=v=>`${v>=0?"+":"−"}${fmtIT(Math.abs(v))} €`;
+  // prossimo addebito delle carte di lavoro: arriva comunque, rimborso o no
+  // somma tutto quello che la carta addebita in quella data (pregresso + spese del periodo)
+  const prox=(()=>{ const v=D.carte.filter(c=>c.lavoro).flatMap(c=>c.pend.map(p=>({c,p}))).sort((a,b)=>a.p.due-b.p.due); if(!v.length) return null;
+    const f=v[0], due=dateISO(f.p.due); return {c:f.c,p:{due:f.p.due,amount:v.filter(x=>x.c.name===f.c.name&&dateISO(x.p.due)===due).reduce((a,x)=>a+x.p.amount,0)}}; })();
+  let h=`<div class="hero"><div class="lbl">Da incassare dal lavoro${eyeHTML()}</div>
+    <div class="big"><span class="cnt" data-v="${A.tot+totInd}" data-d="2">${fmtIT(A.tot+totInd)}</span> €</div>
+    <div class="ytd">${A.n?`Rimborso più vecchio in attesa da ${gg(A.vecchia)} giorni`:"Nessuna spesa in attesa di rimborso"}${A.lag!=null?` · di solito rimborsano in ${Math.round(A.lag)} giorni`:""}</div>
+    <div class="grid3"><div><small>Spese da rimborsare</small><b>${fmt0(A.tot)} €</b><em class="dv">${A.n} ${A.n===1?"spesa":"spese"}</em></div>
+      <div><small>Indennità attese</small><b>${fmt0(totInd)} €</b><em class="dv">${ind.length} ${ind.length===1?"giorno":"giorni"}, netto stimato</em></div>
+      <div><small>Prossimo addebito carta</small><b>${prox?fmt0(-prox.p.amount)+" €":"—"}</b>${prox?`<em class="dv">${esc(lbl(prox.c.name))} · ${dateIT(prox.p.due)}</em>`:""}</div></div></div>`;
+  h+=`<div class="card"><div style="display:flex;gap:8px"><button class="btn" id="lavGiorno" style="flex:1;margin:0">＋ Giorno di trasferta</button><button class="btn" id="lavBonif" style="flex:1;margin:0">Registra bonifico</button></div>
+    ${A.tot>0.005?`<button class="btn" id="lavChiudi" style="width:100%;margin:8px 0 0;font-size:13px;opacity:.75">Chiudi il residuo come non rimborsato</button>`:""}
+    <p style="margin:10px 0 0;font-size:12.5px;color:var(--ink-2)">La carta di lavoro viene addebitata comunque alla sua data: il bonifico ti restituisce i soldi sul conto. Finché non arrivano, queste somme restano fuori da budget, spendibile e cash-flow; nel patrimonio le spese anticipate contano come credito.</p></div>`;
+  if(A.pending.length) h+=`<div class="card"><h3>In attesa di rimborso<small>${A.n} ${A.n===1?"spesa":"spese"}</small></h3><ul class="rows">${A.pending.slice().reverse().map(s=>`<li><span>${esc(s.r.desc)}<small>${dateIT(fromISO(s.r.d))} · ${esc(lbl(s.r.conto))} · da ${gg(s.r.d)} giorni${s.resto<-s.r.imp-0.004?" · rimborsata in parte":""}</small></span><b>${fmtIT(s.resto)} €</b></li>`).join("")}</ul></div>`;
+  if(ind.length) h+=`<div class="card"><h3>Giorni di trasferta da pagare<small>netto stimato</small></h3><ul class="rows">${ind.slice().reverse().map(x=>`<li><span>${dateIT(fromISO(x.d))}</span><b>${fmtIT(x.imp)} €</b></li>`).join("")}</ul></div>`;
+  // mese
+  const ym=LV.month, eff=r=>r.d<=oggi, anti=r=>tipoCat(r.cat)==="Anticipo";
+  const inM=r=>r.d.slice(0,7)===ym&&eff(r), sum=f=>S.rows.filter(f).reduce((a,r)=>a+r.imp,0);
+  const antM=-sum(r=>inM(r)&&anti(r)&&r.imp<0), rimM=sum(r=>inM(r)&&anti(r)&&r.imp>0&&!r.chiusura), indM=sum(r=>inM(r)&&r.cat===CAT_IND), gM=(S.trasf||[]).filter(x=>x.d.slice(0,7)===ym).length;
+  const righe=S.rows.filter(r=>r.d.slice(0,7)===ym&&(anti(r)||r.cat===CAT_IND)).sort((a,b)=>a.d<b.d?1:a.d>b.d?-1:0);
+  h+=`<div class="card"><div class="mnav"><button id="lvPrev">‹</button><b>${monthLabel(ym)}</b><button id="lvNext">›</button></div>
+    <div class="kpi"><div><small>Spese anticipate</small><b>${fmt0(antM)} €</b></div><div><small>Rimborsi ricevuti</small><b>${fmt0(rimM)} €</b></div><div><small>Indennità ricevute</small><b>${fmt0(indM)} €</b></div><div><small>Giorni di trasferta</small><b>${gM}</b></div></div>
+    ${righe.length?`<ul class="rows" style="margin-top:10px">${righe.map(r=>`<li><span>${esc(r.desc)}<small>${dateIT(fromISO(r.d))} · ${esc(lbl(r.conto))}${r.d>oggi?" · futuro":""}</small></span><b class="${r.imp>0?"in":""}">${sg(r.imp)}</b></li>`).join("")}</ul>`:`<p style="margin:10px 0 0;font-size:13px;color:var(--ink-2)">Nessun movimento di lavoro in questo mese.</p>`}</div>`;
+  // anno
+  const y=String(t.getFullYear()), inY=r=>r.d.startsWith(y)&&eff(r);
+  const antY=-sum(r=>inY(r)&&anti(r)&&r.imp<0), rimY=sum(r=>inY(r)&&anti(r)&&r.imp>0&&!r.chiusura), chY=sum(r=>inY(r)&&r.chiusura), indY=sum(r=>inY(r)&&r.cat===CAT_IND), gY=(S.trasf||[]).filter(x=>x.d.startsWith(y)).length;
+  h+=`<div class="card"><h3>Anno ${y}</h3><ul class="rows">
+    <li><span>Spese anticipate</span><b>${fmtIT(antY)} €</b></li>
+    <li><span>Rimborsi ricevuti</span><b>${fmtIT(rimY)} €</b></li>
+    ${chY>0.005?`<li><span>Chiuse come non rimborsate<small>diventate spese tue</small></span><b>${fmtIT(chY)} €</b></li>`:""}
+    <li><span>Indennità nette ricevute<small>${gY} ${gY===1?"giorno":"giorni"} di trasferta segnati</small></span><b>${fmtIT(indY)} €</b></li>
+    ${A.lag!=null?`<li><span>Tempo medio di rimborso<small>su ${A.nLag} ${A.nLag===1?"spesa rimborsata":"spese rimborsate"}</small></span><b>${Math.round(A.lag)} giorni</b></li>`:""}</ul></div>`;
+  body.innerHTML=h; animateCounts(body); applyPriv(); bindLavoro();
+  const shift=k=>{ const [yy,mm]=LV.month.split("-").map(Number); LV.month=dateISO(new Date(yy,mm-1+k,1)).slice(0,7); haptic(); renderLavoro(); };
+  $("lvPrev").onclick=()=>shift(-1); $("lvNext").onclick=()=>shift(1);
+}
 function openLavGiorno(){
   const ind=indennitaAttese();
   $("lavTitle").textContent="Giorno di trasferta";
@@ -3107,7 +3166,7 @@ function openLavBonif(){
     ind.slice(0,n).forEach(x=>{ x.pagata=true; x.pagataIl=d; });
     // solo se confermato netto: altrimenti il lordo del bonifico sovrascriverebbe la stima netta
     if($("lb_cal").checked&&n>0&&i>0.004){ S.indGiorno=Math.round(i/n*100)/100; indennitaAttese().forEach(x=>x.imp=S.indGiorno); }
-    save(); syncLocal(); haptic("ok"); toast("Bonifico registrato"); openRp(); setActiveNav("rp"); };
+    save(); syncLocal(); haptic("ok"); toast("Bonifico registrato"); goTab("lav"); };
   openSheet("sheetLav");
 }
 function chiudiResiduoLavoro(){
@@ -3115,7 +3174,8 @@ function chiudiResiduoLavoro(){
   if(!confirm(`Chiudere ${fmtIT(cr.tot)} € come non rimborsati?\nDiventano una spesa tua di oggi (categoria Altro) e il credito si azzera. Il saldo del conto non cambia.`)) return;
   const d=dateISO(today()), conto=bancaPredefinita(), cat=S.cats.some(c=>c.name==="Altro"&&c.tipo==="Spesa")?"Altro":(S.cats.find(c=>c.tipo==="Spesa")||{}).name;
   nuovaRiga(d,"Spese di lavoro non rimborsate",cat,conto,-cr.tot); nuovaRiga(d,"Chiusura credito lavoro",CAT_RIMB,conto,cr.tot);
-  save(); syncLocal(); toast("Residuo chiuso"); renderRp();
+  S.rows[S.rows.length-1].chiusura=true; // non è un rimborso vero: fuori da statistiche e tempi di rimborso
+  save(); syncLocal(); toast("Residuo chiuso"); renderLavoro();
 }
 
 // ================= CASH-FLOW FUTURO =================
@@ -3481,7 +3541,8 @@ $("contiSave").onclick=()=>{
   const names=CONTI_DRAFT.map(a=>a.name.trim()); if(!names.length) return toast("Serve almeno un conto",true); if(names.some(n=>!n)) return toast("Ogni conto deve avere un nome",true);
   if(new Set(names.map(norm)).size!==names.length) return toast("Due conti hanno lo stesso nome",true);
   CONTI_DRAFT.forEach(a=>{ a.name=a.name.trim(); if(a._old&&a._old!==a.name){ renameInRows("conto",a._old,a.name); CONTI_DRAFT.forEach(b=>{ if(b.addebita===a._old) b.addebita=a.name; }); if(S.defConto===a._old) S.defConto=a.name; } });
-  S.accounts=CONTI_DRAFT.map(({_old,...a})=>a); fissaPregresso(S.accounts); if(!S.accounts.some(a=>a.name===S.defConto)) S.defConto=(S.accounts.find(a=>!a.addebita)||S.accounts[0]||{}).name||"";
+  S.accounts=CONTI_DRAFT.map(({_old,...a})=>a); fissaPregresso(S.accounts);
+  { const h=$("hdr"); if(h){ h.dataset.built=""; paintNav(); } } // la voce Lavoro può comparire o sparire if(!S.accounts.some(a=>a.name===S.defConto)) S.defConto=(S.accounts.find(a=>!a.addebita)||S.accounts[0]||{}).name||"";
   save(); syncLocal(); F.conto=S.defConto; render(); renderSettings(); openSheet("sheetSettings"); toast("Conti salvati");
 };
 let CATS_DRAFT=null;
@@ -3606,7 +3667,8 @@ document.addEventListener("click",e=>{
 },true);
 document.addEventListener("visibilitychange",()=>{ if(document.hidden&&S.privacy!==false){ PRIV=true; applyPriv(); } });
 $("privSel").onclick=e=>{ const b=e.target.closest("button"); if(!b) return; haptic(); S.privacy=b.dataset.p==="1"; save(); PRIV=S.privacy; applyPriv(); };
-load().then(()=>{ PRIV=S.privacy!==false; applyPriv(); applyTheme(S.theme||"auto"); paintName();
+load().then(()=>{ PRIV=S.privacy!==false; applyPriv();
+  { const h=$("hdr"); if(h&&lavoroAttivo()){ h.dataset.built=""; paintNav("main"); } } // la barra è nata prima dei dati applyTheme(S.theme||"auto"); paintName();
   if(!S.onboarded){ S.onboarded=true; save(); setTimeout(()=>{ renderSettings(); openSheet("sheetSettings"); toast("Benvenuto! Imposta nome, conti con saldo iniziale e categorie"); },900); } { const fd=$("famDate"); if(fd) fd.textContent=today().toLocaleDateString("it-IT",{weekday:"long",day:"numeric",month:"long"}); } render(); if(S.share&&S.cache&&Date.now()-S.cache.ts>4*3600e3) refreshExcel(false).catch(()=>{}); });
 </script>
 </body>
