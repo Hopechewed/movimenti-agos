@@ -2964,6 +2964,7 @@ function renderBud(){
   h+=`<div class="card"><ul class="rows">
     ${B?`<li><span>Budget mensile</span><b>${fmtIT(B)} €</b></li><li><span>Speso<small>solo spese discrezionali effettive</small></span><b>${fmtIT(speso)} €</b></li><li><span>Budget residuo</span><b>${fmtIT(resid)} €</b></li>`:""}
     <li><span>Spendibile reale<small>liquidità − carte da addebitare − uscite note fino a fine mese</small></span><b>${fmtIT(sp)} €</b></li>
+    ${lavoroAttivo()&&creditoLavoro().tot>0.005?`<li><span>Spese di lavoro da rimborsare<small>fuori dal budget; pesano sullo spendibile finché non arriva il rimborso</small></span><b>${fmtIT(creditoLavoro().tot)} €</b></li>`:""}
     <li><span>Giorni rimanenti<small>oggi incluso</small></span><b>${gg}</b></li></ul></div>`;
   if(B>0){ const qT=t.getDate()/dim, qB=speso/B, diff=B*qT-speso;
     h+=`<div class="card"><h3>Ritmo di spesa</h3><p style="margin:0 0 8px;font-size:14px;color:var(--ink-2)">È trascorso il ${Math.round(qT*100)}% del mese, hai consumato il ${Math.round(qB*100)}% del budget.</p>
