@@ -1200,6 +1200,9 @@ const CONTI_NASCOSTI=new Set(["BPER"]);
 const CONTO_TRASFERTE="__nessuno__", CAT_TRASFERTE="__nessuna__";
 // lavoro: le spese rimborsabili sono anticipi (tipo "Anticipo"), non spese; l'indennità invece è reddito
 const CAT_LAV="Lavoro (da rimborsare)", CAT_RIMB="Rimborso spese lavoro", CAT_IND="Indennità trasferta";
+// netto stimato dei 100 € lordi CCNL dirigenti industria (art. 51 c.5 TUIR, dirigente al 43% + addizionali + INPS 10,19%):
+// esenzione 30,99 € con pasti rimborsati, 15,49 € con pasti e albergo, 51,65 € all'estero con pasti rimborsati
+const IND_NETTO=65, IND_PRESET=[["Italia in giornata",65],["Italia con pernotto",57],["Estero",75]];
 const GIORNO_ADDEBITO={};
 const MESI_RITARDO={};
 const CARTE_EXTRA=[];
@@ -1245,6 +1248,8 @@ function save(){ clearTimeout(saveT); saveT=setTimeout(()=>{ const {cache,...res
 function syncLocal(){
   if(S.accounts.some(a=>a.addebita&&Math.abs(a.saldo0||0)>0.004&&!a.pregressoData)){ fissaPregresso(S.accounts); save(); }
   S.trasf=S.trasf||[]; if(S.accounts.some(a=>a.lavoro)) assicuraCategorieLavoro();
+  // da lordo a netto: i giorni segnati con i 100 € lordi passano alla stima netta
+  if(!S.indNetto){ if(!S.indGiorno||S.indGiorno===100) S.indGiorno=IND_NETTO; S.trasf.forEach(t=>{ if(!t.pagata&&t.imp===100) t.imp=S.indGiorno; }); S.indNetto=true; save(); }
   CATS.length=0; S.cats.forEach(c=>CATS.push(c.name));
   IN_CATS.clear(); S.cats.filter(c=>c.tipo==="Entrata").forEach(c=>IN_CATS.add(c.name)); IN_CATS.add(CAT_RIMB);
   CONTI.length=0; S.accounts.forEach(a=>CONTI.push(a.name));
@@ -3058,7 +3063,7 @@ function lavoroHTML(){
   const cr=creditoLavoro(), ind=indennitaAttese(), totInd=ind.reduce((a,t)=>a+t.imp,0), gg=d=>daysBetween(fromISO(d),today());
   return `<div class="card"><h3>Lavoro e trasferte<small>da incassare</small></h3><ul class="rows">
     <li><span>Spese da rimborsare<small>${cr.tot>0.005&&cr.vecchia?`${cr.n} ${cr.n===1?"spesa":"spese"} · la più vecchia in attesa da ${gg(cr.vecchia)} giorni`:"nessuna in attesa"}</small></span><b>${fmtIT(cr.tot)} €</b></li>
-    <li><span>Indennità attese<small>${ind.length?`${ind.length} ${ind.length===1?"giorno":"giorni"} di trasferta · ${fmtIT(S.indGiorno||100)} € al giorno`:"nessun giorno di trasferta segnato"}</small></span><b>${fmtIT(totInd)} €</b></li>
+    <li><span>Indennità attese<small>${ind.length?`${ind.length} ${ind.length===1?"giorno":"giorni"} di trasferta · stima netta`:"nessun giorno di trasferta segnato"}</small></span><b>${fmtIT(totInd)} €</b></li>
     <li class="tot"><span>Totale da incassare<small>fuori da spendibile e cash-flow: non si sa quando arriva</small></span><b>${fmtIT(cr.tot+totInd)} €</b></li></ul>
     <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="lavGiorno" style="flex:1;margin:0">＋ Giorno di trasferta</button><button class="btn" id="lavBonif" style="flex:1;margin:0">Registra bonifico</button></div>
     ${cr.tot>0.005?`<button class="btn" id="lavChiudi" style="width:100%;margin:8px 0 0;font-size:13px;opacity:.75">Chiudi il residuo come non rimborsato</button>`:""}</div>`;
@@ -3068,14 +3073,16 @@ function bindLavoro(){ const a=$("lavGiorno"), b=$("lavBonif"), c=$("lavChiudi")
 function openLavGiorno(){
   const ind=indennitaAttese();
   $("lavTitle").textContent="Giorno di trasferta";
-  $("lavBody").innerHTML=`<div class="prow"><div class="in2"><div><label>Data</label><input type="date" id="lg_d" value="${dateISO(today())}"></div><div><label>Indennità attesa €</label><input id="lg_i" inputmode="decimal" value="${String(S.indGiorno||100).replace(".",",")}"></div></div>
-    <p style="margin:8px 0 0;font-size:13px;opacity:.75">Solo trasferte oltre le 12 ore. Metti quello che ti arriva davvero sul conto: dopo il primo bonifico l'app si ricalibra da sola.</p></div>
+  $("lavBody").innerHTML=`<div class="prow"><div class="in2"><div><label>Data</label><input type="date" id="lg_d" value="${dateISO(today())}"></div><div><label>Indennità netta attesa €</label><input id="lg_i" inputmode="decimal" value="${String(S.indGiorno||IND_NETTO).replace(".",",")}"></div></div>
+    <div class="chips" id="lg_pre" style="margin-top:10px">${IND_PRESET.map(([n,v])=>`<button type="button" data-v="${v}" class="${(S.indGiorno||IND_NETTO)===v?"on":""}">${n} · ${v} €</button>`).join("")}</div>
+    <p style="margin:8px 0 0;font-size:13px;opacity:.75">Solo trasferte di almeno 12 ore. Sono stime del netto dei 100 € lordi: la parte oltre la soglia esente paga IRPEF e contributi. Correggi se la busta paga dice altro.</p></div>
     <button class="go" id="lg_save" style="width:100%">Aggiungi giorno</button>
     ${ind.length?`<div class="prow" style="margin-top:12px"><b>In attesa di pagamento</b><ul class="rules" style="margin-top:8px">${ind.slice().reverse().map(t=>`<li><span class="txt"><b>${dateIT(fromISO(t.d))}</b><small>${fmtIT(t.imp)} €</small></span><button class="del" data-tid="${esc(t.id)}" aria-label="Rimuovi">✕</button></li>`).join("")}</ul></div>`:""}`;
   $("lg_save").onclick=()=>{ const d=$("lg_d").value, v=numIT2($("lg_i").value); if(!d||isNaN(v)||v<=0) return toast("Controlla data e importo",true);
     if(S.trasf.some(t=>t.d===d)) return toast("Quel giorno è già segnato",true);
-    S.trasf.push({id:newId(),d,imp:Math.round(v*100)/100,pagata:false}); S.indGiorno=Math.round(v*100)/100; save(); haptic("ok"); toast("Giorno di trasferta aggiunto"); openLavGiorno(); };
+    S.trasf.push({id:newId(),d,imp:Math.round(v*100)/100,pagata:false}); save(); haptic("ok"); toast("Giorno di trasferta aggiunto"); openLavGiorno(); };
   $("lavBody").querySelectorAll("[data-tid]").forEach(b=>b.onclick=()=>{ S.trasf=S.trasf.filter(t=>t.id!==b.dataset.tid); save(); openLavGiorno(); });
+  $("lg_pre").onclick=e=>{ const b=e.target.closest("button"); if(!b) return; haptic(); $("lg_i").value=String(b.dataset.v); $("lg_pre").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); };
   openSheet("sheetLav");
 }
 function openLavBonif(){
@@ -3087,7 +3094,8 @@ function openLavBonif(){
     <div class="in2"><div><label>Data</label><input type="date" id="lb_d" value="${dateISO(today())}"></div><div><label>Accreditato su</label><select id="lb_c">${banche.map(b=>`<option ${b===def?"selected":""}>${esc(b)}</option>`).join("")}</select></div></div>
     <div class="in2" style="grid-template-columns:1fr"><div><label>Importo ricevuto €</label><input id="lb_t" inputmode="decimal" value="${String(Math.round((cr.tot+indDi(ind.length))*100)/100).replace(".",",")}"></div></div>
     <div class="in2"><div><label>Giorni di indennità inclusi</label><input id="lb_n" inputmode="numeric" value="${ind.length}"></div><div><label>Di cui indennità €</label><input id="lb_i" inputmode="decimal" value="${String(Math.round(indDi(ind.length)*100)/100).replace(".",",")}"></div></div>
-    <p id="lb_sum" style="margin:10px 0 0;font-weight:600"></p></div>
+    <p id="lb_sum" style="margin:10px 0 0;font-weight:600"></p>
+    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:13px;opacity:.85"><input type="checkbox" id="lb_cal" style="margin-top:2px"> L'indennità di questo bonifico è già netta: usala come netto atteso per i prossimi giorni. Se ti arrivano i 100 € lordi lascia vuoto: le tasse le vedrai in busta paga.</label></div>
     <button class="go" id="lb_save" style="width:100%">Registra bonifico</button>`;
   const upd=()=>{ const t=numIT2($("lb_t").value)||0, i=numIT2($("lb_i").value)||0, r=t-i;
     $("lb_sum").innerHTML=r<-0.004?`<span style="color:var(--warn)">L'indennità supera il bonifico</span>`:`Rimborso spese ${fmtIT(r)} € · indennità (entrata) ${fmtIT(i)} €${r>cr.tot+0.5?` <small style="color:var(--warn);display:block;font-weight:500">Più delle spese in attesa: controlla di averle registrate tutte</small>`:""}`; };
@@ -3097,8 +3105,8 @@ function openLavBonif(){
     if(!d||isNaN(t)||t<=0||i<0||i>t+0.004) return toast("Controlla data e importi",true);
     const r=t-i; if(r>0.004) nuovaRiga(d,"Rimborso nota spese",CAT_RIMB,conto,r); if(i>0.004) nuovaRiga(d,"Indennità trasferta",CAT_IND,conto,i);
     ind.slice(0,n).forEach(x=>{ x.pagata=true; x.pagataIl=d; });
-    // l'indennità netta reale ricalibra quella attesa per i prossimi giorni
-    if(n>0&&i>0.004){ S.indGiorno=Math.round(i/n*100)/100; indennitaAttese().forEach(x=>x.imp=S.indGiorno); }
+    // solo se confermato netto: altrimenti il lordo del bonifico sovrascriverebbe la stima netta
+    if($("lb_cal").checked&&n>0&&i>0.004){ S.indGiorno=Math.round(i/n*100)/100; indennitaAttese().forEach(x=>x.imp=S.indGiorno); }
     save(); syncLocal(); haptic("ok"); toast("Bonifico registrato"); openRp(); setActiveNav("rp"); };
   openSheet("sheetLav");
 }
