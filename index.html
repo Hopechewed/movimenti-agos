@@ -103,6 +103,9 @@
   .sugg::-webkit-scrollbar{display:none}
   .sugg button{flex:0 0 auto;background:var(--key);border-radius:999px;padding:6px 11px;font-size:13px;font-weight:600;min-height:32px}
   .sugg button small{color:var(--ink-2);font-weight:500;margin-left:5px}
+  .sugg button.due{background:var(--go-soft);color:var(--go);box-shadow:inset 0 0 0 1.5px var(--go)}
+  .sugg button.due small{color:var(--go);opacity:.85}
+  .app .sugg.fav{justify-content:flex-start}
 
   .chips{display:flex;flex-wrap:wrap;gap:7px}
   #cat{flex:1 1 0;min-height:52px;margin-bottom:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1px 2px 2px;gap:6px;
@@ -1257,7 +1260,9 @@ function toast(msg,warn){ const t=$("toast"); t.textContent=msg; t.className="to
 // useGrouping "always": in it-IT le cifre sotto 10.000 non verrebbero raggruppate (1300 vs 16.184)
 function fmtIT(n){ return n.toLocaleString("it-IT",{minimumFractionDigits:2,maximumFractionDigits:2,useGrouping:"always"}); }
 function fmt0(n){ return (Math.round(n)||0).toLocaleString("it-IT",{maximumFractionDigits:0,useGrouping:"always"}); }
-function amtNum(){ return F.amt? parseFloat(F.amt.replace(",","."))||0 : 0; }
+// il tastierino non inserisce mai punti: se ci sono, sono separatori delle migliaia
+function amtNum(){ return F.amt? parseFloat(F.amt.replace(/\./g,"").replace(",","."))||0 : 0; }
+function amtStr(n){ return (Math.round(Math.abs(n)*100)/100).toFixed(2).replace(".",","); }
 function pad2(n){ return String(n).padStart(2,"0"); }
 function today(){ const d=new Date(); d.setHours(12,0,0,0); return d; }
 function selDate(){ if(F.dCustom) return new Date(F.dCustom+"T12:00:00"); const d=today(); d.setDate(d.getDate()-F.dOff); return d; }
@@ -1418,14 +1423,40 @@ function renderDue(){
 }
 function applyEntry(e,withAmt,planId){
   F.desc=e.desc; $("desc").value=e.desc; F.cat=e.cat; F.conto=e.conto;
-  if(withAmt&&e.imp&&!F.amt) F.amt=fmtIT(e.imp);
+  if(withAmt&&e.imp&&!F.amt) F.amt=amtStr(e.imp);
   F.sign=IN_CATS.has(e.cat)?1:-1;
   F.planId=planId||null;
   haptic(); render();
 }
+// ricorrenti già scadute (questo mese e il precedente) e non ancora confermate, con la loro data
+function daConfermare(){
+  const t=today(), o=dateISO(t), cur=o.slice(0,7), prev=dateISO(new Date(t.getFullYear(),t.getMonth()-1,1)).slice(0,7), out=[];
+  [prev,cur].forEach(ym=>pianiDelMese(ym).forEach(p=>{ if(Math.abs(pianoResiduoMese(p,ym))<0.005) return;
+    const [y,m]=ym.split("-").map(Number), dim=new Date(y,m,0).getDate();
+    const due=p.type==="once"?p.data:p.type==="monthly"?`${ym}-${pad2(Math.min(p.from||1,dim))}`:null;
+    if(due?due>o:ym!==cur) return; out.push({p,due}); }));
+  return out.sort((a,b)=>(a.due||"")<(b.due||"")?-1:1);
+}
+// voci più usate, con un piccolo vantaggio a quelle usate nell'ultimo mese
+function vociFrequenti(q,max){
+  const last={}; allHist().forEach(h=>{ if(!last[h.k]||h.d>last[h.k]) last[h.k]=h.d; });
+  const soglia=dateISO(new Date(today().getTime()-30*86400000));
+  return Object.entries(allDict()).filter(([k,e])=>!q||norm(e.desc).startsWith(q)).map(([k,e])=>({...e,s:e.n+((last[k]||"")>=soglia?3:0)})).sort((a,b)=>b.s-a.s).slice(0,max);
+}
 function renderSugg(){
   const q=norm(F.desc); const box=$("sugg");
-  if(q.length<2){ box.innerHTML=""; return; }
+  if(q.length<2){
+    const due=q?[]:daConfermare(), dueDesc=new Set(due.map(x=>norm(x.p.desc)));
+    const fav=vociFrequenti(q,8).filter(e=>!dueDesc.has(norm(e.desc)));
+    box.classList.toggle("fav",!!(due.length||fav.length));
+    box.innerHTML=due.map((x,i)=>`<button class="due" data-d="${i}">${esc(x.p.desc)}<small>${pianoSignedAmt(x.p)>0?"+":""}${fmtIT(Math.abs(x.p.imp))} € · da confermare</small></button>`).join("")
+      +fav.map((e,i)=>`<button data-i="${i}">${esc(e.desc)}<small>${esc(e.cat)}</small></button>`).join("");
+    box.querySelectorAll("button[data-d]").forEach(b=>b.onclick=()=>{ const x=due[+b.dataset.d];
+      applyEntry({desc:x.p.desc,cat:x.p.cat,conto:x.p.conto,imp:x.p.imp},true,x.p.id);
+      if(x.due&&x.due<dateISO(today())){ F.dCustom=x.due; $("dateIn").value=x.due; render(); } });
+    box.querySelectorAll("button[data-i]").forEach(b=>b.onclick=()=>applyEntry(fav[+b.dataset.i],true));
+    return; }
+  box.classList.remove("fav");
   const hits=Object.values(allDict()).filter(e=>norm(e.desc).includes(q)&&norm(e.desc)!==q).sort((a,b)=>b.n-a.n).slice(0,6);
   box.innerHTML=hits.map((e,i)=>`<button data-i="${i}">${esc(e.desc)}<small>${esc(e.cat)}</small></button>`).join("");
   box.querySelectorAll("button").forEach(b=>b.onclick=()=>applyEntry(hits[+b.dataset.i],true));
@@ -1504,7 +1535,7 @@ function applySpeech(text){
   const p=parseSpeech(text); let got=[];
   if(p.entry){ applyEntry(p.entry,false); got.push(p.entry.desc); }
   else if(p.desc){ F.desc=p.desc; $("desc").value=p.desc; got.push(p.desc); }
-  if(p.amt){ F.amt=fmtIT(p.amt); got.push(fmtIT(p.amt)+" €"); }
+  if(p.amt){ F.amt=amtStr(p.amt); got.push(fmtIT(p.amt)+" €"); }
   if(p.cat){ F.cat=p.cat; F.sign=IN_CATS.has(p.cat)?1:-1; }
   if(p.conto) F.conto=p.conto;
   if(p.sign) F.sign=p.sign;
