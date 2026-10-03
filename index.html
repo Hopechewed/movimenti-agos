@@ -1163,7 +1163,7 @@ const DOW=["domenica","lunedì","martedì","mercoledì","giovedì","venerdì","s
 const MESI=["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const MESI_S=["Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic"];
 const KEY="movimentiapp:state";
-const XLSX_CDN="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+const XLSX_SRC="lib/xlsx.full.min.js";
 const PALETTE=["#1F6FD0","#F2A93B","#2BB673","#E4572E","#8E5BD9","#17A2B8","#D6469A","#7C8C9E","#A3C644","#C77B36","#5A6C80","#3DBFD8"];
 
 const STORICO_PRE=[];
@@ -1233,7 +1233,7 @@ function daysBetween(a,b){ return Math.round((b-a)/86400000); }
 function norm(s){ return String(s||"").trim().toLowerCase().replace(/\s+/g," "); }
 
 function shortDate(d){ return d.toLocaleDateString("it-IT",{day:"numeric",month:"short"}); }
-function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
 // ---------- dizionario unificato (locale + Excel) ----------
 function allHist(){ // storico completo: righe Excel + righe locali non ancora in Excel
@@ -1424,9 +1424,9 @@ function renderCats(){
   const match=c=>!q||norm(c).includes(q);
   const fav=q?[]:[...CATS].filter(c=>cc[c]).sort((a,b)=>cc[b]-cc[a]).slice(0,4);
   const resto=[...CATS].filter(c=>!fav.includes(c)&&match(c)).sort((a,b)=>a.localeCompare(b,"it"));
-  box.innerHTML=fav.map(c=>`<button class="${c===F.cat?"on":""} fav" data-c="${c}">${c}</button>`).join("")
+  box.innerHTML=fav.map(c=>`<button class="${c===F.cat?"on":""} fav" data-c="${esc(c)}">${esc(c)}</button>`).join("")
     +(fav.length?`<span class="sep"></span>`:"")
-    +resto.map(c=>`<button class="${c===F.cat?"on":""}" data-c="${c}">${c}</button>`).join("");
+    +resto.map(c=>`<button class="${c===F.cat?"on":""}" data-c="${esc(c)}">${esc(c)}</button>`).join("");
   box.classList.toggle("filtering",!!q);
   box.querySelectorAll("button[data-c]").forEach(b=>b.onclick=()=>{ F.cat=b.dataset.c; F.sign=IN_CATS.has(F.cat)?1:-1; haptic(); if(q){ $("catSearch").value=""; $("catSearchBox").classList.remove("open"); } render(); });
   if(q&&!resto.length) box.innerHTML=`<span class="scrollhint" style="width:100%">Nessuna categoria con "${esc(q)}"</span>`;
@@ -1434,7 +1434,7 @@ function renderCats(){
 }
 function renderConti(){
   const box=$("conto");
-  box.innerHTML=CONTI.map(c=>`<button class="${c===F.conto?"on":""}" data-c="${c}">${lbl(c)}</button>`).join("");
+  box.innerHTML=CONTI.map(c=>`<button class="${c===F.conto?"on":""}" data-c="${esc(c)}">${esc(lbl(c))}</button>`).join("");
   box.querySelectorAll("button").forEach(b=>b.onclick=()=>{ F.conto=b.dataset.c; haptic();
     // carta di lavoro: la spesa parte come anticipo da farsi rimborsare (si può sempre cambiare categoria)
     const acc=S.accounts.find(a=>a.name===F.conto); if(acc&&acc.lavoro&&CATS.includes(CAT_LAV)&&(!F.cat||tipoCat(F.cat)==="Spesa")){ F.cat=CAT_LAV; F.sign=-1; }
@@ -1581,7 +1581,7 @@ document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>{ const el=$(
 
 function renderLog(){
   const ul=$("logList");
-  ul.innerHTML=S.log.length?S.log.map((r,i)=>`<li><b>${esc(r.Descrizione)}</b><span class="v ${r.Importo>0?"in":""}">${r.ImportoIT} €</span><span class="m">${r.Data} · ${esc(r.Categoria)} · ${esc(r.Conto)}</span><span class="st ${r.ok?"":"err"}">${r.wa?"WhatsApp":r.copied?"copiata":r.ok?"inviata":"non inviata"} <button class="x" data-i="${i}" aria-label="Rimuovi dall'elenco">✕</button></span></li>`).join(""):`<li><span class="m">Ancora nessun movimento.</span></li>`;
+  ul.innerHTML=S.log.length?S.log.map((r,i)=>`<li><b>${esc(r.Descrizione)}</b><span class="v ${r.Importo>0?"in":""}">${esc(r.ImportoIT)} €</span><span class="m">${esc(r.Data)} · ${esc(r.Categoria)} · ${esc(r.Conto)}</span><span class="st ${r.ok?"":"err"}">${r.wa?"WhatsApp":r.copied?"copiata":r.ok?"inviata":"non inviata"} <button class="x" data-i="${i}" aria-label="Rimuovi dall'elenco">✕</button></span></li>`).join(""):`<li><span class="m">Ancora nessun movimento.</span></li>`;
   ul.querySelectorAll(".x").forEach(b=>b.onclick=()=>{ S.log.splice(+b.dataset.i,1); save(); renderLog(); render(); toast("Rimossa dall'elenco (in Excel resta)"); });
 }
 $("btnCopyAll").onclick=()=>{ if(!S.log.length) return; copyText(S.log.slice().reverse().map(tsv).join("\n"),`${S.log.length} righe copiate`); };
@@ -1591,7 +1591,7 @@ $("btnClearLog").onclick=()=>{ if(confirm("Svuotare l'elenco degli inviati?")){ 
 function renderSettings(){
   $("hook").value=S.hook; $("share").value=S.share||""; $("pac").value=S.pac||""; $("wa").value=S.wa||"";
   $("dateFmt").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.f===S.dateFmt));
-  $("defConto").innerHTML=CONTI.map(c=>`<button class="${c===S.defConto?"on":""}" data-c="${c}">${lbl(c)}</button>`).join("");
+  $("defConto").innerHTML=CONTI.map(c=>`<button class="${c===S.defConto?"on":""}" data-c="${esc(c)}">${esc(lbl(c))}</button>`).join("");
   $("defConto").querySelectorAll("button").forEach(b=>b.onclick=()=>{ S.defConto=b.dataset.c; save(); renderSettings(); });
   const nx=S.cache?S.cache.rows.length:0;
   $("memInfo").textContent=`${S.rows.length} movimenti · ${S.accounts.length} conti · ${S.cats.length} categorie · ${S.assets.length} asset`; paintName();
@@ -1619,61 +1619,61 @@ $("btnImport").onclick=()=>{ importRows(); }; function _oldImport(){
   S.hist.sort((a,b)=>a.d<b.d?-1:1); S.hist=S.hist.slice(-600);
   save(); $("imp").value=""; renderSettings(); render(); toast(ok?`${ok} righe importate`:"Nessuna riga valida: servono almeno Descrizione, Categoria, Conto",!ok);
 };
-$("btnExport").onclick=()=>{ const {cache,...rest}=S; copyText(JSON.stringify(rest),"Backup copiato negli appunti"); };
-$("btnImportBak").onclick=()=>{ try{ const v=JSON.parse($("bak").value.trim()); if(!v||!v.dict||!v.rows) throw 0; const keepHook=S.hook, keepShare=S.share, keepCache=S.cache; S={...S,...v}; if(!S.hook) S.hook=keepHook; if(!S.share) S.share=keepShare;  syncLocal(); save(); $("bak").value=""; renderSettings(); resetForm(); toast("Backup importato"); }catch(e){ toast("Backup non valido: incolla il testo copiato con \"Copia backup\"",true); } };
+// ---------- backup: si importano solo dati, con il tipo giusto ----------
+// Un backup può arrivare da chiunque: niente indirizzi di invio (webhook, relay, WhatsApp), niente HTML nei testi,
+// date e numeri controllati, nessuna chiave che tocchi i prototipi. Struttura e valori legittimi restano identici.
+const BAK_ISO=/^\d{4}-\d{2}-\d{2}$/, BAK_ID=/^[\w-]{1,64}$/, BAK_VIETATE=new Set(["__proto__","constructor","prototype"]);
+const BAK_DATE=new Set(["d","data","inizio","pregressoData","pagataIl","DataISO","t","ad"]);
+const BAK_NUM=new Set(["imp","saldo0","giorno","ritardo","chiusura","days","from","dow","n","fatte","qty","price","value","v","a","budget","Importo","DataSeriale","ts","cap","pac","rate","infl","spesa","swr","anni"]);
+const BAK_IDS=new Set(["id","planId"]);
+function bakTesto(x){ return String(x).replace(/[<>]/g,"").slice(0,1000); }
+function bakNum(x){ const n=typeof x==="number"?x:(typeof x==="string"&&x.trim()!==""?Number(x):NaN); return Number.isFinite(n)?n:undefined; }
+function bakVal(k,v){
+  if(v===null||typeof v==="boolean") return v;
+  if(BAK_DATE.has(k)) return typeof v==="string"&&BAK_ISO.test(v)?v:undefined;
+  if(BAK_NUM.has(k)) return bakNum(v);
+  if(BAK_IDS.has(k)) return typeof v==="string"&&BAK_ID.test(v)?v:undefined;
+  if(typeof v==="number") return Number.isFinite(v)?v:undefined;
+  if(typeof v==="string") return bakTesto(v);
+  if(Array.isArray(v)) return v.map(x=>bakVal("",x)).filter(x=>x!==undefined);
+  if(typeof v==="object") return bakOgg(v);
+  return undefined;
+}
+function bakOgg(o){ const out={}; for(const [k,v] of Object.entries(o)){ if(BAK_VIETATE.has(k)) continue; const x=bakVal(k,v); if(x!==undefined) out[bakTesto(k)]=x; } return out; }
+// mappe con chiavi libere (nomi di voci e categorie): la chiave non decide il tipo del valore
+function bakMappa(o,valore){ const out={}; if(!o||typeof o!=="object"||Array.isArray(o)) return out;
+  for(const [k,v] of Object.entries(o)){ if(BAK_VIETATE.has(k)) continue; const x=valore(v); if(x!==undefined) out[bakTesto(k)]=x; } return out; }
+function bakLista(a){ return Array.isArray(a)?a.filter(x=>x&&typeof x==="object"&&!Array.isArray(x)).map(bakOgg):undefined; }
+function pulisciBackup(v){
+  if(!v||typeof v!=="object"||Array.isArray(v)) return null;
+  const o={};
+  for(const k of ["rows","cats","accounts","assets","storico","log","hist","piani","trasf"]) if(k in v){ const x=bakLista(v[k]); if(x) o[k]=x; }
+  // un record senza i campi indispensabili romperebbe i calcoli: meglio scartarlo che tenerlo a metà
+  const serve={rows:["d","imp"],storico:["d","v"],hist:["d"],trasf:["d","imp"],cats:["name"],accounts:["name"],assets:["name"],piani:["desc","imp"]};
+  for(const [k,campi] of Object.entries(serve)) if(o[k]) o[k]=o[k].filter(x=>campi.every(c=>x[c]!=null&&x[c]!==""));
+  if(o.piani) o.piani=o.piani.filter(x=>x.type!=="once"||x.data);
+  for(const k of ["rows","piani","trasf"]) (o[k]||[]).forEach(x=>{ if(!x.id) x.id=newId(); });
+  if("dict" in v) o.dict=bakMappa(v.dict,x=>x&&typeof x==="object"&&!Array.isArray(x)?bakOgg(x):undefined);
+  if("catN" in v) o.catN=bakMappa(v.catN,bakNum);
+  if("budget" in v) o.budget=bakMappa(v.budget,bakNum);
+  if(Array.isArray(v.muted)) o.muted=v.muted.filter(x=>typeof x==="string").map(bakTesto);
+  if(v.fire&&typeof v.fire==="object"&&!Array.isArray(v.fire)) o.fire=bakOgg(v.fire);
+  if(typeof v.assetDate==="string"&&BAK_ISO.test(v.assetDate)) o.assetDate=v.assetDate; else if(v.assetDate===null) o.assetDate=null;
+  for(const k of ["budgetDisc","indGiorno","pianoInv"]) if(k in v){ const n=v[k]===null?null:bakNum(v[k]); if(n!==undefined) o[k]=n; }
+  for(const k of ["indNetto","v2","onboarded","privacy"]) if(typeof v[k]==="boolean") o[k]=v[k];
+  for(const k of ["nome","defConto","dateFmt","theme"]) if(typeof v[k]==="string") o[k]=bakTesto(v[k]);
+  return o;
+}
+// il backup porta i dati, non gli indirizzi a cui l'app invia informazioni: quelli restano sul telefono
+$("btnExport").onclick=()=>{ const {cache,hook,share,pac,wa,...rest}=S; copyText(JSON.stringify(rest),"Backup copiato negli appunti"); };
+$("btnImportBak").onclick=()=>{ try{ const v=pulisciBackup(JSON.parse($("bak").value.trim())); if(!v||!v.dict||!v.rows) throw 0; S={...S,...v}; syncLocal(); save(); $("bak").value=""; renderSettings(); resetForm(); toast("Backup importato"); }catch(e){ toast("Backup non valido: incolla il testo copiato con \"Copia backup\"",true); } };
+
 $("btnReset").onclick=()=>{ if(confirm("Cancellare TUTTI i movimenti, conti, categorie e asset? Fai prima un backup.")){ S={hook:"",share:"",pac:"",wa:"",dateFmt:"serial",defConto:"Conto corrente",nome:"",rows:[],cats:DEF_CATS.map(c=>({...c})),accounts:DEF_ACCOUNTS.map(a=>({...a})),assets:[],assetDate:null,storico:[],dict:{},catN:{},log:[],hist:[],muted:[],piani:[],cache:null,v2:true,onboarded:true}; syncLocal(); save(); renderSettings(); resetForm(); } };
 
 // ================= LETTURA EXCEL =================
-function loadXLSX(){ return window.XLSX?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=XLSX_CDN; s.onload=res; s.onerror=()=>rej(new Error("Libreria Excel non scaricata: controlla la connessione")); document.head.appendChild(s); }); }
-function shareUrls(link){
-  const b64=btoa(unescape(encodeURIComponent(link))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
-  return [`https://api.onedrive.com/v1.0/shares/u!${b64}/root/content`, link+(link.includes("?")?"&":"?")+"download=1"];
-}
-async function fetchWorkbook(){
-  let lastErr="";
-  const bust=u=>u+(u.includes("?")?"&":"?")+"t="+Date.now();
-  const urls=/1drv\.ms|onedrive\.live\.com/.test(S.share)?shareUrls(S.share):[bust(S.share)];
-  for(const u of urls){
-    try{ const r=await fetch(u,{cache:"no-store"}); if(!r.ok){ let t=""; try{ t=(await r.text()).replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,60); }catch(e){} lastErr=r.status===403?"Chiave ?k= errata":`Il relay ha risposto ${r.status}${t?": "+t:""}`; continue; }
-      const buf=await r.arrayBuffer(); const b=new Uint8Array(buf.slice(0,2));
-      if(b[0]===0x50&&b[1]===0x4B){ const lm=r.headers.get("last-modified"); R.relayMod=lm?new Date(lm).getTime():null; return buf; } lastErr="L'indirizzo non restituisce il file Excel: controlla il relay e la chiave ?k="; }
-    catch(e){ lastErr="Impossibile raggiungere il relay (indirizzo errato o offline)"; }
-  }
-  throw new Error(lastErr||"Download non riuscito");
-}
-function cellDate(v){
-  if(v==null||v==="") return null;
-  if(typeof v==="number") return serialISO(v);
-  if(v instanceof Date) return dateISO(v);
-  const s=String(v).trim(); let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if(m){ let y=+m[3]; if(y<100) y+=2000; return `${y}-${pad2(m[2])}-${pad2(m[1])}`; }
-  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[0]; return null;
-}
-function parseWorkbook(buf){
-  const wb=XLSX.read(buf,{type:"array",cellDates:false});
-  const need=["Movimenti","Impostazioni","Patrimonio"]; for(const n of need) if(!wb.Sheets[n]) throw new Error(`Manca il foglio ${n} nel file`);
-  const mv=XLSX.utils.sheet_to_json(wb.Sheets["Movimenti"],{header:1,range:"A5:J5024",raw:true,defval:null});
-  const rows=[]; for(const r of mv){ const d=cellDate(r[0]); const imp=typeof r[4]==="number"?r[4]:parseFloat(String(r[4]||"").replace(",",".")); if(!d||isNaN(imp)||!r[1]) continue; rows.push({d,desc:String(r[1]).trim(),cat:String(r[2]||"").trim(),conto:String(r[3]||"").trim(),imp:Math.round(imp*100)/100}); }
-  const im=XLSX.utils.sheet_to_json(wb.Sheets["Impostazioni"],{header:1,range:"A5:K31",raw:true,defval:null});
-  const cats=[], accounts=[];
-  for(const r of im.slice(0,27)){ if(r[1]) cats.push({name:String(r[1]).trim(),emoji:r[2]||"",tipo:String(r[3]||"").trim(),budget:Math.abs(+r[4]||0)}); }
-  for(const r of im.slice(0,9)){ if(r[6]&&!CONTI_NASCOSTI.has(String(r[6]).trim())) accounts.push({name:String(r[6]).trim(),saldo0:+r[7]||0,addebita:r[8]?String(r[8]).trim():""}); }
-  const ps=wb.Sheets["Patrimonio"]; const gv=a=>{ const c=ps[a]; return c?c.v:null; };
-  const assets=[]; for(let r=31;r<=36;r++){ const name=gv("B"+r); if(!name) continue; const qty=gv("C"+r), price=gv("D"+r); const value=(typeof qty==="number"&&typeof price==="number")?qty*price:(typeof price==="number"?price:(+gv("E"+r)||0)); assets.push({name:String(name),qty:typeof qty==="number"?qty:null,price:typeof price==="number"?price:null,value:Math.round(value*100)/100}); }
-  const assetDate=cellDate(gv("E4"));
-  const storico=[]; for(let r=58;r<=200;r++){ const d=cellDate(gv("B"+r)); const v=gv("C"+r); if(!d||typeof v!=="number") { if(r>60&&!gv("B"+r)) break; continue; } storico.push({d,v}); }
-  const pm=wb.Props&&wb.Props.ModifiedDate; const fileMod=pm?new Date(pm).getTime():null;
-  return {ts:Date.now(),rows,cats,accounts,assets,assetDate,storico,fileMod};
-}
-async function fetchPrices(){
-  try{ const u=S.share+(S.share.includes("?")?"&":"?")+"q=prices&t="+Date.now(); const r=await fetch(u,{cache:"no-store"}); if(!r.ok) return; const j=await r.json(); if(j&&typeof j==="object") R.prices=j.prices||j; }catch(e){}
-}
-let lastRefresh=0;
-async function refreshExcel(force){
-  syncLocal(); render(); return;
-  if(!force&&Date.now()-lastRefresh<60000) return;
-  await loadXLSX(); const [buf]=await Promise.all([fetchWorkbook(),fetchPrices()]); const data=parseWorkbook(buf);
-  if(!data.fileMod&&R.relayMod) data.fileMod=R.relayMod; S.cache=data; lastRefresh=Date.now(); save(); render();
-}
+function loadXLSX(){ return window.XLSX?Promise.resolve():new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=XLSX_SRC; s.onload=res; s.onerror=()=>rej(new Error("Libreria Excel non scaricata: controlla la connessione")); document.head.appendChild(s); }); }
+// i dati vivono sul telefono: "aggiornare" significa ricostruire la cache locale (il vecchio relay Excel è stato tolto)
+async function refreshExcel(){ syncLocal(); render(); }
 
 // ---------- storico mensile del patrimonio ----------
 function mergeStorico(st){
@@ -1794,7 +1794,7 @@ function donutSVG(items,total,label){ // items: [{name,emoji,v}]
   return `<svg viewBox="0 0 150 150" width="150" height="150" aria-hidden="true">${paths}<text class="c1" x="75" y="71" text-anchor="middle" font-size="11" fill="var(--ink-2)">${label}</text><text class="c2" x="75" y="88" text-anchor="middle" font-size="15" font-weight="700" fill="var(--ink)">${fmt0(total)} €</text></svg>`;
 }
 function donutHTML(items,total,label){
-  return `<div class="donutwrap">${donutSVG(items,total,label)}<ul class="legend">${items.map((c,i)=>`<li data-i="${i}"><i style="background:${PALETTE[i%PALETTE.length]}"></i><span>${c.emoji?c.emoji+" ":""}${esc(c.name)}</span><b>${fmt0(c.v)} €<small>${Math.round(c.v/total*100)}%</small></b></li>`).join("")}</ul></div>`;
+  return `<div class="donutwrap">${donutSVG(items,total,label)}<ul class="legend">${items.map((c,i)=>`<li data-i="${i}"><i style="background:${PALETTE[i%PALETTE.length]}"></i><span>${c.emoji?esc(c.emoji)+" ":""}${esc(c.name)}</span><b>${fmt0(c.v)} €<small>${Math.round(c.v/total*100)}%</small></b></li>`).join("")}</ul></div>`;
 }
 function bindDonut(wrap,items,total,label){
   const svg=wrap.querySelector("svg"), c1=svg.querySelector(".c1"), c2=svg.querySelector(".c2"); let hi=null, tmr=null;
@@ -2125,7 +2125,7 @@ function renderRp(){
   }
   // entrate del mese
   const inItems=M.byCatIn.map(c=>({name:c.name,emoji:c.emoji,v:c.incassato}));
-  if(M.byCatIn.length) h+=`<div class="card" id="inCard"><h3>Entrate<small>${monthLabel(R.month)}</small><button class="btn" id="btnBudgetIn" style="float:right;margin:-6px 0 0;padding:6px 10px;min-height:30px;font-size:13px">✎ Obiettivi</button></h3>${M.entrate>0?donutHTML(inItems,M.entrate,"Entrate"):""}<ul class="rows" style="margin-top:10px">${M.byCatIn.map(c=>expLi(c.name,`<span>${c.emoji?c.emoji+" ":""}${esc(c.name)}${c.budget?`<small>obiettivo ${fmt0(c.budget)} € · ${Math.round(c.incassato/c.budget*100)}%</small><div class="bar"><i class="ok" style="width:${Math.min(100,c.incassato/c.budget*100)}%"></i></div>`:`<small>nessun obiettivo</small>`}</span>`,`<b style="color:var(--in)">${fmtIT(c.incassato)} €</b>`)).join("")}${M.byCatInv.length?M.byCatInv.map(c=>expLi(c.name,`<span>${c.emoji?c.emoji+" ":""}${esc(c.name)}<small>versato, non una spesa${c.budget?` · piano ${fmt0(c.budget)} €`:""}</small>${c.budget?`<div class="bar"><i style="width:${Math.min(100,c.versato/c.budget*100)}%"></i></div>`:""}</span>`,`<b>${fmtIT(c.versato)} €</b>`)).join(""):""}<li class="tot"><span>Totale entrate</span><b style="color:var(--in)">${fmtIT(M.entrate)} €</b></li></ul></div>`;
+  if(M.byCatIn.length) h+=`<div class="card" id="inCard"><h3>Entrate<small>${monthLabel(R.month)}</small><button class="btn" id="btnBudgetIn" style="float:right;margin:-6px 0 0;padding:6px 10px;min-height:30px;font-size:13px">✎ Obiettivi</button></h3>${M.entrate>0?donutHTML(inItems,M.entrate,"Entrate"):""}<ul class="rows" style="margin-top:10px">${M.byCatIn.map(c=>expLi(c.name,`<span>${c.emoji?esc(c.emoji)+" ":""}${esc(c.name)}${c.budget?`<small>obiettivo ${fmt0(c.budget)} € · ${Math.round(c.incassato/c.budget*100)}%</small><div class="bar"><i class="ok" style="width:${Math.min(100,c.incassato/c.budget*100)}%"></i></div>`:`<small>nessun obiettivo</small>`}</span>`,`<b style="color:var(--in)">${fmtIT(c.incassato)} €</b>`)).join("")}${M.byCatInv.length?M.byCatInv.map(c=>expLi(c.name,`<span>${c.emoji?esc(c.emoji)+" ":""}${esc(c.name)}<small>versato, non una spesa${c.budget?` · piano ${fmt0(c.budget)} €`:""}</small>${c.budget?`<div class="bar"><i style="width:${Math.min(100,c.versato/c.budget*100)}%"></i></div>`:""}</span>`,`<b>${fmtIT(c.versato)} €</b>`)).join(""):""}<li class="tot"><span>Totale entrate</span><b style="color:var(--in)">${fmtIT(M.entrate)} €</b></li></ul></div>`;
   // piano del mese: da dove vengono i soldi e dove vanno (budget, media 12 mesi, mese corrente)
   h+=pianoHTML(D,M,curM);
   // torta
@@ -2133,7 +2133,7 @@ function renderRp(){
   h+=`<div class="card" id="outCard"><h3>Spese per categoria<small>${monthLabel(R.month)}</small><button class="btn" id="btnBudget" style="float:right;margin:-6px 0 0;padding:6px 10px;min-height:30px;font-size:13px">✎ Budget</button></h3>`;
   if(!items.length) h+=`<div class="empty">${EMPTY_ART.chart}Nessuna spesa registrata in questo mese.</div>`;
   else{ h+=donutHTML(items,M.spese,"Spese");
-    h+=`<ul class="rows" style="margin-top:10px">${M.byCat.map(c=>expLi(c.name,`<span>${c.emoji?c.emoji+" ":""}${esc(c.name)}${c.budget?`<small>budget ${fmt0(c.budget)} € · ${Math.round(c.speso/c.budget*100)}%</small><div class="bar"><i class="${c.speso>c.budget?"over":""}" style="width:${Math.min(100,c.speso/c.budget*100)}%"></i></div>`:`<small>nessun budget</small>`}</span>`,`<b>${fmtIT(c.speso)} €</b>`)).join("")}</ul>`; }
+    h+=`<ul class="rows" style="margin-top:10px">${M.byCat.map(c=>expLi(c.name,`<span>${c.emoji?esc(c.emoji)+" ":""}${esc(c.name)}${c.budget?`<small>budget ${fmt0(c.budget)} € · ${Math.round(c.speso/c.budget*100)}%</small><div class="bar"><i class="${c.speso>c.budget?"over":""}" style="width:${Math.min(100,c.speso/c.budget*100)}%"></i></div>`:`<small>nessun budget</small>`}</span>`,`<b>${fmtIT(c.speso)} €</b>`)).join("")}</ul>`; }
   h+=`</div>`;
   // saldi
   h+=`<div class="card"><h3>Saldo per conto</h3><ul class="rows">${D.saldi.map(a=>`<li><span>${esc(lbl(a.name))}</span><b>${fmtIT(a.saldo)} €</b></li>`).join("")}<li class="tot"><span>Totale liquidità</span><b>${fmtIT(D.liquidita)} €</b></li>${D.carte.map(c=>{
@@ -2236,7 +2236,7 @@ function openBudget(){
   const cats=C.cats.filter(c=>ORD.includes(c.tipo)).sort((a,b)=>ORD.indexOf(a.tipo)-ORD.indexOf(b.tipo));
   let last=null;
   $("budgetRows").innerHTML=cats.map((c,i)=>{ const o=S.budget&&S.budget[c.name]; const v=budgetOf(c); const hd=c.tipo!==last?`<div class="day" style="font-size:14px;font-weight:700;margin:14px 0 6px">${TIT[c.tipo]}</div>`:""; last=c.tipo;
-    return hd+`<div class="prow"><b>${c.emoji?c.emoji+" ":""}${esc(c.name)}</b>
+    return hd+`<div class="prow"><b>${c.emoji?esc(c.emoji)+" ":""}${esc(c.name)}</b>
     <div class="in2"><div><label>${c.tipo==="Entrata"?"Obiettivo":c.tipo==="Investimento"?"Piano":"Budget"} mensile €</label><input inputmode="decimal" id="bd_${i}" value="${String(v).replace(".",",")}"></div></div></div>`; }).join("");
   openSheet("sheetBudget");
   $("btnBudgetSave").onclick=()=>{ S.budget=S.budget||{}; let n=0;
@@ -2311,7 +2311,7 @@ function flashMovimento(r){
   const catsF=(S.cache&&S.cache.cats)||[]; const tipoF=n=>{ const c=catsF.find(c=>c.name===n); return c?c.tipo:(IN_CATS.has(n)?"Entrata":"Spesa"); };
   const isSpesa=tipoF(r.Categoria)==="Spesa";
   if(T.entrata){
-    c.innerHTML=`<div class="em">${emo&&emo.emoji?emo.emoji:"✨"}</div>
+    c.innerHTML=`<div class="em">${emo&&emo.emoji?esc(emo.emoji):"✨"}</div>
       <div class="k">Ottimo, incassati</div>
       <div class="cat">${esc(r.Categoria)}</div>
       <div class="n">${fmtIT(T.cat)} €</div>
@@ -2321,7 +2321,7 @@ function flashMovimento(r){
     f.className="flash in show";
   } else if(!isSpesa){
     // trasferimenti / investimenti: mostra la voce senza confonderla con le spese del mese
-    c.innerHTML=`<div class="em">${emo&&emo.emoji?emo.emoji:"🔄"}</div>
+    c.innerHTML=`<div class="em">${emo&&emo.emoji?esc(emo.emoji):"🔄"}</div>
       <div class="k">Registrato in ${esc(r.Categoria)}</div>
       <div class="n">${fmtIT(Math.abs(T.cat))} €</div>
       <div class="m">in ${mLabel}</div>`;
@@ -2329,7 +2329,7 @@ function flashMovimento(r){
   } else {
     const speso=Math.abs(T.cat), totale=Math.abs(T.tot);
     const perc=T.budget?Math.min(100,speso/T.budget*100):Math.min(100,speso/Math.max(1,totale)*100);
-    c.innerHTML=`<div class="em">${emo&&emo.emoji?emo.emoji:"💸"}</div>
+    c.innerHTML=`<div class="em">${emo&&emo.emoji?esc(emo.emoji):"💸"}</div>
       <div class="k">Finora in ${esc(r.Categoria)}</div>
       <div class="n">${fmtIT(speso)} €</div>
       <div class="m">in ${mLabel}${T.budget?` · ${Math.round(speso/T.budget*100)}% della soglia`:""}</div>
@@ -2494,9 +2494,9 @@ applyFam(loadFam());
 $("picDel").onclick=()=>{ savePic(null); applyPic(null); toast("Sfondo rimosso"); };
 
 // ================= REPORT PDF =================
-const JSPDF_CDN="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+const JSPDF_SRC="lib/jspdf.umd.min.js";
 let REP={month:null};
-function loadJsPDF(){ return (window.jspdf&&window.jspdf.jsPDF)?Promise.resolve():new Promise((res,rej)=>{ const sc=document.createElement("script"); sc.src=JSPDF_CDN; sc.onload=res; sc.onerror=()=>rej(new Error("Libreria PDF non scaricata: controlla la connessione")); document.head.appendChild(sc); }); }
+function loadJsPDF(){ return (window.jspdf&&window.jspdf.jsPDF)?Promise.resolve():new Promise((res,rej)=>{ const sc=document.createElement("script"); sc.src=JSPDF_SRC; sc.onload=res; sc.onerror=()=>rej(new Error("Libreria PDF non scaricata: controlla la connessione")); document.head.appendChild(sc); }); }
 function closedMonths(){ const D=calc(); if(!D) return []; const cur=dateISO(today()).slice(0,7); return D.months.filter(m=>m<cur).slice(-24).reverse(); }
 function openReport(){
   const ms=closedMonths(); if(!ms.length){ toast("Nessun mese chiuso da esportare",true); return; }
@@ -3312,14 +3312,14 @@ function renderMv(){
     for(const r of shown){ if(r.d!==day){ if(day)h+=`</ul>`; day=r.d; h+=`<div class="day">${fromISO(r.d).toLocaleDateString("it-IT",{weekday:"short",day:"numeric",month:"long"})}</div><ul class="list">`; }
       const ci=(C.cats.find(c=>c.name===r.cat)||{}); const col=PALETTE[[...r.cat].reduce((a,ch)=>a+ch.charCodeAt(0),0)%PALETTE.length];
       const fut=r.d>dateISO(today());
-      h+=`<li data-id="${r.id||""}" class="mvrow"${fut?' style="opacity:.75"':""}><span class="cico" style="background:${col}">${ci.emoji||"•"}</span><span class="txt"><b>${esc(r.desc)}</b><small>${esc(r.cat)} · ${esc(lbl(r.conto))}${fut?" · futuro, non ancora effettivo":""}</small></span><span class="v ${r.imp>0?"in":""}">${fmtIT(r.imp)} €</span></li>`; }
+      h+=`<li data-id="${esc(r.id||"")}" class="mvrow"${fut?' style="opacity:.75"':""}><span class="cico" style="background:${col}">${esc(ci.emoji||"•")}</span><span class="txt"><b>${esc(r.desc)}</b><small>${esc(r.cat)} · ${esc(lbl(r.conto))}${fut?" · futuro, non ancora effettivo":""}</small></span><span class="v ${r.imp>0?"in":""}">${fmtIT(r.imp)} €</span></li>`; }
     h+=`</ul>`;
     if(rows.length>MV.limit) h+=`<button class="more2" id="mvMore">Mostra altri ${Math.min(60,rows.length-MV.limit)} (di ${rows.length-MV.limit})</button>`;
   }
   if(virt.length){
     h+=`<div class="day">Previste · ${monthLabel(MV.month)}<small style="opacity:.7"> non ancora confermate</small></div><ul class="list">`;
     h+=virt.map(r=>{ const ci=(C.cats.find(c=>c.name===r.cat)||{}); const col=PALETTE[[...r.cat].reduce((a,ch)=>a+ch.charCodeAt(0),0)%PALETTE.length];
-      return `<li class="mvrow" style="opacity:.6"><span class="cico" style="background:${col}">${ci.emoji||"•"}</span><span class="txt"><b>${esc(r.desc)}</b><small>${esc(r.cat)} · ${esc(lbl(r.conto))} · previsto</small></span><span class="v ${r.imp>0?"in":""}">${fmtIT(r.imp)} €</span></li>`; }).join("");
+      return `<li class="mvrow" style="opacity:.6"><span class="cico" style="background:${col}">${esc(ci.emoji||"•")}</span><span class="txt"><b>${esc(r.desc)}</b><small>${esc(r.cat)} · ${esc(lbl(r.conto))} · previsto</small></span><span class="v ${r.imp>0?"in":""}">${fmtIT(r.imp)} €</span></li>`; }).join("");
     h+=`</ul>`;
   }
   $("mvBody").innerHTML=h;
@@ -3411,7 +3411,7 @@ let CATS_DRAFT=null;
 function openCats(){ CATS_DRAFT=S.cats.map(c=>({...c,budget:budgetOf(c),_old:c.name})); paintCats(); openSheet("sheetCats"); }
 function paintCats(){
   const T=["Spesa","Entrata","Investimento","Trasferimento","Anticipo"];
-  $("catsRows").innerHTML=CATS_DRAFT.map((c,i)=>`<div class="prow"><div class="rowbar"><b>${c.emoji?c.emoji+" ":""}${esc(c.name||"Nuova")}</b><button class="btn danger" data-del="${i}">Elimina</button></div>
+  $("catsRows").innerHTML=CATS_DRAFT.map((c,i)=>`<div class="prow"><div class="rowbar"><b>${c.emoji?esc(c.emoji)+" ":""}${esc(c.name||"Nuova")}</b><button class="btn danger" data-del="${i}">Elimina</button></div>
     <div class="in2" style="grid-template-columns:64px 1fr"><div><label>Emoji</label><input data-f="emoji" data-i="${i}" value="${esc(c.emoji||"")}"></div><div><label>Nome</label><input data-f="name" data-i="${i}" value="${esc(c.name)}"></div></div>
     <div class="in2"><div><label>Tipo</label><select data-f="tipo" data-i="${i}">${T.map(t=>`<option ${t===c.tipo?"selected":""}>${t}</option>`).join("")}</select></div><div><label>${c.tipo==="Entrata"?"Obiettivo":c.tipo==="Investimento"?"Piano":"Budget"} mensile €</label><input data-f="budget" data-i="${i}" inputmode="decimal" value="${String(c.budget||0).replace(".",",")}"></div></div></div>`).join("");
   $("catsRows").querySelectorAll("[data-f]").forEach(el=>el.onchange=el.oninput=()=>{ const c=CATS_DRAFT[+el.dataset.i], f=el.dataset.f; if(f==="budget") c.budget=numIT2(el.value)||0; else c[f]=el.value; if(f==="tipo") paintCats(); });
@@ -3529,15 +3529,21 @@ document.addEventListener("click",e=>{
 },true);
 document.addEventListener("visibilitychange",()=>{ if(document.hidden&&S.privacy!==false){ PRIV=true; applyPriv(); } });
 // ---------- aggiornamento automatico: le app aggiunte alla Home su iOS restano ferme su versioni vecchie ----------
-// All'apertura (e al ritorno nell'app) confronta la versione online; se è più nuova ricarica saltando la cache.
-const APP_VERSION="2026.09.29-4";
+// All'apertura (e al ritorno nell'app, al massimo ogni 15 minuti) legge version.json, poche decine di byte:
+// se la versione online è diversa ricarica saltando la cache. version.json va aggiornato insieme ad APP_VERSION.
+const APP_VERSION="2026.10.03-1";
 $("appVer").textContent="Versione "+APP_VERSION;
+let ultimoControlloAgg=0;
 function controllaAggiornamento(){
   if(location.protocol==="file:"||!navigator.onLine) return;
-  try{ if(sessionStorage.getItem("aggTentato")===APP_VERSION) return; }catch(e){}
-  fetch(location.pathname+"?nocache="+Date.now(),{cache:"no-store"}).then(r=>r.ok?r.text():"").then(t=>{
-    const m=t.match(/const APP_VERSION="([^"]+)"/);
-    if(m&&m[1]!==APP_VERSION){ try{ sessionStorage.setItem("aggTentato",APP_VERSION); }catch(e){} location.replace(location.pathname+"?v="+encodeURIComponent(m[1])); }
+  if(Date.now()-ultimoControlloAgg<15*60*1000) return;
+  ultimoControlloAgg=Date.now();
+  fetch(new URL("version.json?t="+Date.now(),location.href),{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{
+    const v=j&&typeof j.v==="string"&&/^[\w.-]{1,40}$/.test(j.v)?j.v:null;
+    if(!v||v===APP_VERSION) return;
+    // un solo tentativo per versione e per sessione: se la cache non molla non si entra in un ciclo di ricariche
+    try{ if(sessionStorage.getItem("aggTentato")===v) return; sessionStorage.setItem("aggTentato",v); }catch(e){ return; }
+    location.replace(location.pathname+"?v="+encodeURIComponent(v));
   }).catch(()=>{});
 }
 controllaAggiornamento();
